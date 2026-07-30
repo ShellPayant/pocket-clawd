@@ -1,0 +1,36 @@
+{
+  "_comment": [
+    "Pocket Clawd settings. Delete any line you don't need -- every key has a",
+    "sensible default. Copy this to config.json (the installer does that for",
+    "you) and edit it on the console or from your PC over the network.",
+    "",
+    "mode: how usage data reaches this console.",
+    "  push   - a PC sends it to us. The default, and needs no setup here.",
+    "  pull   - we fetch it from a PC that is running the pusher with --serve.",
+    "  direct - we ask Anthropic ourselves, using token.json next to this file.",
+    "           Works with no PC at all, including away from home. Read",
+    "           docs/NETWORKING.md first: it puts a token on the SD card.",
+    "",
+    "buttons: only needed if this handheld reports unusual codes. Rather than",
+    "  guess, run 'python3 clawd.py --map-buttons' on the console and press",
+    "  each button when asked -- it writes the right numbers in here."
+  ],
+
+  "mode": "push",
+  "port": 8788,
+  "discovery": true,
+
+  "warn_pct": 60,
+  "crit_pct": 85,
+  "fps": 20,
+
+  "_examples": {
+    "secret": "shared-password-both-sides-must-match",
+    "pc_url": "http://192.168.1.10:8789/usage.json",
+    "poll_seconds": 60,
+    "buttons": {
+      "select": [314, 704],
+      "start": [315, 705]
+    }
+  }
+}

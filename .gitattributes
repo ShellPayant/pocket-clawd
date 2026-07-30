@@ -1,0 +1,22 @@
+# The shell scripts and Python run on a Linux handheld. A CRLF line ending in
+# a .sh file makes the shebang fail there with a confusing "bad interpreter"
+# error, so force LF regardless of what platform someone checks out on.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.json text eol=lf
+*.txt  text eol=lf
+*.md   text eol=lf
+
+# these are only ever run by Windows
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# don't touch these at all
+*.png  binary
+*.gif  binary
+*.jpg  binary
+*.wav  binary
+*.raw  binary
+*.svg  text eol=lf

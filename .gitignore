@@ -1,0 +1,30 @@
+# simulator scratch output
+/sim/
+
+# python
+__pycache__/
+*.py[cod]
+
+# things that must never be committed
+device/config.json      # a user's own settings
+device/token.json       # an OAuth token, in direct mode
+*.credentials.json
+token.json
+
+# runtime state
+*.log
+usage_hist.jsonl
+*.jsonl.tmp
+
+# personal audio dropped in to replace the anthem
+device/anthem.mp3
+device/anthem.ogg
+device/anthem.opus
+device/anthem.m4a
+device/anthem.flac
+device/badchange.*
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini

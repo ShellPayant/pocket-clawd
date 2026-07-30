@@ -1,0 +1,40 @@
+# Things Clawd says. One per line. Lines starting with # are ignored.
+#
+# Write your own -- this file is the whole feature. The bitmap font only has
+# A-Z, 0-9 and : . - ( ) / + ! ? = % and space, everything is drawn uppercase,
+# and long lines wrap to at most three rows of sixteen characters.
+#
+# Two words get special treatment wherever they appear: ULTRATHINK animates in
+# rainbow, ULTRACODE pulses purple.
+
+HI! I AM CLAWD
+TOKENS GO BRRR
+SNIP SNIP!
+I LIVE HERE NOW
+TOUCH GRASS BETWEEN PROMPTS
+ALL SYSTEMS CORAL
+DRAWN PIXEL BY PIXEL
+NO CLOUD. JUST CRAB.
+SHIPPING BEATS PERFECT
+
+# button hints
+PRESS X = DANCE
+PRESS Y = WAVE
+PRESS L2 = A SONG
+PRESS B = NEW FRIENDS
+
+# shop talk
+THEY SHIPPING THEY SHIPPING
+BAD CHANGE!
+LOOKS GOOD TO ME
+I START MY DAY IN PLAN MODE
+WATCH THE CONTEXT WINDOW
+MAKE ANOTHER .MD
+BEEN HERE SINCE 2.0
+THERE ARE LEVELS TO PROMPTING
+ULTRATHINK!
+TIME TO ULTRATHINK
+ULTRACODE ENGAGED
+SERVER DOWN CAUSE MCP
+ITS JUST NOT CC
+ORCHESTRATION MADE ME TEAM LEAD
