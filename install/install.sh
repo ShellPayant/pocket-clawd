@@ -50,8 +50,25 @@ echo "=== Pocket Clawd installer ==="
 echo
 
 # --- 1. where do the ROMs live? --------------------------------------------
-# Whichever card EmulationStation reads is the one that has to hold the app.
-# If this script is already sitting on a card, that's the one.
+# Whichever card EmulationStation actually reads is the one that has to hold
+# the app. On a two-card setup that is often /roms2, even though the app files
+# might be sitting on /roms -- so ask the config rather than guess, by seeing
+# which root the existing systems use.
+if [ -z "$ROMS" ] && [ -f "$ES_CFG" ]; then
+    # note: grep -c prints "0" *and* exits non-zero when nothing matches, so
+    # "grep -c ... || echo 0" yields two lines, not one
+    n1=$(grep -c '<path>/roms/' "$ES_CFG" 2>/dev/null | head -1)
+    n2=$(grep -c '<path>/roms2/' "$ES_CFG" 2>/dev/null | head -1)
+    [ -n "$n1" ] || n1=0
+    [ -n "$n2" ] || n2=0
+    if [ "$n2" -gt "$n1" ] && [ -d /roms2 ]; then
+        ROMS="/roms2"
+        say "detected  : EmulationStation reads /roms2 ($n2 systems there)"
+    elif [ "$n1" -gt 0 ] && [ -d /roms ]; then
+        ROMS="/roms"
+        say "detected  : EmulationStation reads /roms ($n1 systems there)"
+    fi
+fi
 if [ -z "$ROMS" ]; then
     case "$REPO" in
         /roms2/*) ROMS="/roms2" ;;
@@ -153,8 +170,14 @@ fi
 
 # --- 4. the logo, in every theme the console has ----------------------------
 themed=0
+seen_roots=""
 for root in $THEME_ROOTS; do
     [ -d "$root" ] || continue
+    # /etc/emulationstation/themes is often a symlink to /roms/themes; doing
+    # the same folder twice is harmless but the count reads as a lie
+    real=$(cd "$root" 2>/dev/null && pwd -P) || continue
+    case " $seen_roots " in *" $real "*) continue ;; esac
+    seen_roots="$seen_roots $real"
     for set_dir in "$root"/*/; do
         [ -d "$set_dir" ] || continue
         [ -f "$set_dir/theme.xml" ] || continue
@@ -199,10 +222,12 @@ say "themes      : logo installed into $themed theme(s)"
 echo
 say "Restarting EmulationStation so it picks up the new system..."
 sleep 1
-if command -v systemctl > /dev/null 2>&1 && systemctl restart emulationstation 2>/dev/null; then
-    :
+# needs root, and we may not be root; -n so a password prompt can't hang us
+if systemctl restart emulationstation 2>/dev/null    || sudo -n systemctl restart emulationstation 2>/dev/null; then
+    say "EmulationStation restarted."
 else
-    say "Could not restart it automatically -- reboot the console instead."
+    say "Could not restart it automatically. Reboot the console, or run:"
+    say "    sudo systemctl restart emulationstation"
 fi
 
 echo

@@ -85,10 +85,12 @@ rm -f /tmp/pocket-clawd.json 2>/dev/null
 echo
 say "Restarting EmulationStation..."
 sleep 1
-if command -v systemctl > /dev/null 2>&1 && systemctl restart emulationstation 2>/dev/null; then
-    :
+# needs root, and we may not be root; -n so a password prompt can't hang us
+if systemctl restart emulationstation 2>/dev/null    || sudo -n systemctl restart emulationstation 2>/dev/null; then
+    say "EmulationStation restarted."
 else
-    say "Could not restart it automatically -- reboot the console instead."
+    say "Could not restart it automatically. Reboot the console, or run:"
+    say "    sudo systemctl restart emulationstation"
 fi
 
 echo
