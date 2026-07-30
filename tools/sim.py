@@ -85,7 +85,7 @@ def write_fixtures(state, simdir):
             f.write(json.dumps(rec, separators=(",", ":")) + "\n")
 
 
-def render(state, out, frames, say=None, panel=None):
+def render(state, out, frames, say=None, panel=None, action=None):
     simdir = os.path.join(SIMDIR, state)
     write_fixtures(state, simdir)
     env = dict(os.environ)
@@ -97,6 +97,8 @@ def render(state, out, frames, say=None, panel=None):
         env["CLAWD_SIM_SAY"] = say
     if panel:
         env["CLAWD_SIM_PANEL"] = panel
+    if action:
+        env["CLAWD_SIM_ACTION"] = action
     os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
     r = subprocess.run([sys.executable, os.path.join(DEVICE, "clawd.py")],
                        env=env, cwd=ROOT)
@@ -115,6 +117,7 @@ def main():
     ap.add_argument("--frames", type=int, default=80)
     ap.add_argument("--say", help="force a speech bubble")
     ap.add_argument("--panel", help="pretend the panel is this size, e.g. 1280x720")
+    ap.add_argument("--action", help="press a button partway through, e.g. shuffle")
     args = ap.parse_args()
 
     if args.all:
@@ -123,11 +126,13 @@ def main():
         for state in sorted(STATES):
             out = os.path.join(args.out_dir, "%s.png" % state)
             print("--- %s" % state)
-            bad |= render(state, out, max(30, args.frames), args.say, args.panel)
+            bad |= render(state, out, max(30, args.frames), args.say, args.panel,
+                          args.action)
         return bad
 
     out = args.out or os.path.join(SIMDIR, "preview.gif")
-    return render(args.state, out, args.frames, args.say, args.panel)
+    return render(args.state, out, args.frames, args.say, args.panel,
+                  args.action)
 
 
 if __name__ == "__main__":

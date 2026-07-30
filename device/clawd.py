@@ -114,6 +114,8 @@ WARN = (255, 188, 46)
 BAD = (255, 88, 72)
 CYAN = (112, 216, 236)
 
+THROW_TIME = 0.9      # how long Clawd holds the throwing pose
+
 CORAL = (242, 132, 92)
 CORAL_D = (164, 78, 50)
 CLAW = (224, 114, 78)
@@ -162,13 +164,18 @@ FONT = {
 # actually emits -- its SELECT/START arrive as BTN_TRIGGER_HAPPY1/2 (704/705)
 # rather than BTN_SELECT/BTN_START (314/315). If a device disagrees, run
 # `clawd.py --map-buttons` and the wizard writes the right codes to config.json.
+# Button codes are positional, not by label: BTN_SOUTH is the bottom button and
+# BTN_EAST the right-hand one. Retro handhelds label those Nintendo-style, so
+# the right-hand button is A and the bottom one is B -- the opposite of an Xbox
+# pad. These defaults follow the handheld convention, which is what this whole
+# class of device uses.
 DEFAULT_BUTTONS = {
     "select":   [314, 704],
     "start":    [315, 705],
-    "talk":     [304],   # A / BTN_SOUTH
-    "shuffle":  [305],   # B / BTN_EAST
-    "dance":    [307],   # BTN_NORTH
-    "wave":     [308],   # BTN_WEST
+    "talk":     [305],   # A, the right-hand button  (BTN_EAST)
+    "shuffle":  [304],   # B, the bottom button      (BTN_SOUTH)
+    "dance":    [307],   # X, the top button         (BTN_NORTH)
+    "wave":     [308],   # Y, the left-hand button   (BTN_WEST)
     "zoom_in":  [310],   # L1 / BTN_TL
     "zoom_out": [311],   # R1 / BTN_TR
     "song":     [312],   # L2 / BTN_TL2
@@ -679,6 +686,7 @@ class Clawd:
         self.stick_until = 0     # joystick control active
         self.forced_mood = None  # (mood, until) via d-pad showcase
         self.force_sleep_until = 0
+        self.throw_until = 0     # claws up, launching the tank friends
 
     def poke(self):  # fresh data arrived
         self.jump_until = time.time() + 0.6
@@ -844,6 +852,11 @@ class Clawd:
         elif waving:
             lyl = y + 2 * sc + (-2 * sc if beat else 0)
             lyr = y + 4 * sc
+        elif t < self.throw_until:
+            # both claws thrown upward, following the launch through
+            k = 1.0 - (self.throw_until - t) / THROW_TIME
+            up = int(math.sin(min(1.0, k * 1.6) * math.pi) * 3.2 * sc)
+            lyl = lyr = y + 3 * sc - up
         else:
             lyl = lyr = y + 3 * sc
         scr.sprite(x - 8 * sc, lyl, CLAW_L, sc, {'#': CLAW, 'o': CORAL_D})
@@ -907,6 +920,9 @@ WEED_D = (36, 118, 68)
 STARFISH = (255, 140, 80)
 FRIEND_POSES = ["sleeping", "waving", "mindblown", "celebrating", "happy"]
 PET_YOFF = {"sleeping": 8}  # lying poses sit down into the sand
+TOSS_TIME = 0.85            # seconds a friend spends in the air
+TOSS_HEIGHT = 54            # pixels at the top of the arc
+TOSS_STAGGER = 0.22         # gap between one friend's launch and the next
 
 
 class Friend:
@@ -923,6 +939,8 @@ class Friend:
         self.next_act = time.time() + random.uniform(8, 20)
         self.hop_until = 0
         self.next_hop = time.time() + random.uniform(4, 12)
+        self.toss_at = 0.0        # when Clawd launches this one
+        self.tossed = False       # pose already re-rolled at the apex?
 
     def draw_sign(self, scr, lower=0):
         if not self.session:
@@ -957,18 +975,58 @@ class Friend:
             self.name = random.choice(poses)
         self.hop_until = time.time() + 0.45
 
+    def toss(self, delay=0.0):
+        """Get launched. Staggering the delay down the row makes it read as
+        Clawd juggling them one after another rather than a synchronised jump."""
+        self.toss_at = time.time() + delay
+        self.tossed = False
+
+    def toss_phase(self, t):
+        """0..1 through the flight, or None when on the ground."""
+        if not self.toss_at:
+            return None
+        k = (t - self.toss_at) / TOSS_TIME
+        if k < 0 or k > 1:
+            if k > 1:
+                self.toss_at = 0.0
+            return None
+        return k
+
     def draw(self, scr):
         frames = PETS.get(self.name)
         if not frames:
             return
         t = time.time()
-        pet = frames[int(t * 8 + self.phase * 2) % len(frames)]
+        lift = 0.0
+        spin = 0.0
+        k = self.toss_phase(t)
+        if k is not None:
+            lift = math.sin(k * math.pi) * TOSS_HEIGHT     # up and back down
+            spin = 26                                      # flip through poses fast
+            if not self.tossed and k > 0.45:
+                # swap the pose at the apex: that's the showing-off part
+                self.tossed = True
+                poses = [p for p in FRIEND_POSES if p in PETS and p != self.name]
+                if poses:
+                    self.name = random.choice(poses)
+                    frames = PETS.get(self.name) or frames
+        rate = 8 + spin
+        pet = frames[int(t * rate + self.phase * 2) % len(frames)]
         w, h, _ = pet
         hop = 0
         if t < self.hop_until:
             hop = math.sin((self.hop_until - t) / 0.45 * math.pi) * 9
         yoff = PET_YOFF.get(self.name, 0)
-        scr.blit(int(self.x) - w // 2, int(self.floor - h - hop + yoff), pet)
+        if k is not None:
+            yoff = 0            # airborne: ignore the sit-into-the-sand offset
+        scr.blit(int(self.x) - w // 2,
+                 int(self.floor - h - hop - lift + yoff), pet)
+        if k is not None and k < 0.35:
+            # a couple of specks kicked up from the launch
+            for i in range(3):
+                sx = int(self.x) + (i - 1) * 6
+                sy = int(self.floor - 2 - k * 26 - i * 3)
+                scr.rect(sx, sy, 2, 2, (150, 220, 255))
 
 
 def draw_aquarium(scr, x, y, w, h, t):
@@ -1637,12 +1695,17 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
     crit_at = clawd_config.as_int(CFG, "crit_pct", 85, 1, 100)
     fps = clawd_config.as_int(CFG, "fps", 20, 5, 60)
     trend_steps = (5, 15, 30, 60, 120)  # x2min = 10/30/60/120/240 minutes
-    trend_i = 4
+    # start at the 60-minute window: the widest one looks empty for the first
+    # few hours after an install, which reads as broken rather than new
+    trend_i = 2
     trend_n = trend_steps[trend_i]
     stick = [None]  # latest raw left-stick X value
     title_anim_start = time.time()
     next_title_anim = title_anim_start + 300
     sim_left = int(os.environ.get("CLAWD_SIM_FRAMES", "80")) if SIM else -1
+    sim_action = os.environ.get("CLAWD_SIM_ACTION") if SIM else None
+    # fire it a quarter of the way in, so there's a before and an after
+    sim_action_at = int(sim_left * 0.75) if sim_left > 0 else -1
     netd_check = 0.0
     while True:
         if SIM:
@@ -1768,10 +1831,19 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
             if action is None:
                 return
             clawd.on_action(action)
-            if action == "shuffle" and friends:
-                for fr in friends:
-                    fr.shuffle()
-                clawd.jump_until = time.time() + 0.6
+            if action == "shuffle":
+                now = time.time()
+                if friends:
+                    # Clawd launches them one at a time, and each swaps pose at
+                    # the top of its arc -- the showing-off is the point
+                    clawd.throw_until = now + THROW_TIME + \
+                        TOSS_STAGGER * max(0, len(friends) - 1)
+                    for i, fr in enumerate(friends):
+                        fr.toss(TOSS_STAGGER * i)
+                    clawd.say(random.choice(
+                        ("SHOWTIME!", "MEET THE CREW!", "UP YOU GO!", "TA-DA!")))
+                else:
+                    clawd.jump_until = now + 0.6
             elif action == "zoom_in":
                 self_i[0] = max(0, self_i[0] - 1)
             elif action == "zoom_out":
@@ -1792,6 +1864,10 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
                     clawd.say("NO SONG FILE YET!")
 
         self_i = [trend_i]
+        # In the simulator there is no gamepad, so CLAWD_SIM_ACTION=shuffle
+        # lets a preview show what a button actually does.
+        if SIM and sim_action and sim_left == sim_action_at:
+            fire(sim_action)
         r = select.select(evs, [], [], 0.01)[0] if evs else []
         for f in r:
             for etype, code, value in read_events(f):

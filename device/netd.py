@@ -34,7 +34,12 @@ DATA = clawd_config.data_path(CFG)
 HIST = clawd_config.hist_path(CFG)
 
 HIST_MAX = 12000   # lines; trimmed from the front on startup
-HEARTBEAT = 600    # log an unchanged sample at least this often, so gaps show
+# Log an unchanged sample at least this often, so a real gap (PC asleep) is
+# distinguishable from a flat window. It also sets how fast the trend chart
+# fills on a fresh install: the chart needs two points before it draws anything,
+# so a long heartbeat leaves it saying COLLECTING for ages when usage is idle.
+# At 120s the cap above still holds about two weeks of history.
+HEARTBEAT = 120
 MAX_BODY = 64 * 1024
 
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
@@ -109,8 +114,23 @@ def store(payload, link):
             json.dump(payload, f)
         os.replace(tmp, DATA)
     except OSError as exc:
-        log("cannot write %s: %s" % (DATA, exc))
-        return False
+        # /tmp is sticky: if the file was created by root (the launcher runs
+        # under sudo) a later non-root run cannot rename over it, even though
+        # it can write to it. Fall back to writing in place.
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        try:
+            with open(DATA, "w") as f:
+                json.dump(payload, f)
+            try:
+                os.chmod(DATA, 0o666)
+            except OSError:
+                pass
+        except OSError:
+            log("cannot write %s: %s" % (DATA, exc))
+            return False
     log_hist(payload)
     return True
 

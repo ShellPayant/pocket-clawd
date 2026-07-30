@@ -204,15 +204,33 @@ for root in $THEME_ROOTS; do
 </theme>
 XML
         fi
-        # overwrite every image the donor brought with ours, keeping its names
-        for img in "$dest"/*.png "$dest"/*.svg "$dest"/*.jpg; do
+        # Every image the donor brought is that system's art -- the ArkOS
+        # default theme puts a Doom cyberdemon behind Ports -- so replace all
+        # of them, keeping the donor's filenames so its theme.xml still
+        # resolves. Anything we have no equivalent for is removed rather than
+        # left sitting next to our crab.
+        for img in "$dest"/*.png "$dest"/*.svg "$dest"/*.jpg "$dest"/*.jpeg; do
             [ -f "$img" ] || continue
-            case "$(basename "$img")" in
-                system.*|logo.*|*_logo.*) cp -f "$HERE/theme/system.png" "$img" 2>/dev/null ;;
+            base=$(basename "$img")
+            ext="${base##*.}"
+            src=""
+            case "$base" in
+                *background*|*bg*|*art*|*wheel*)  src="$HERE/theme/background_icon" ;;
+                *system*|*logo*|*icon*)           src="$HERE/theme/system" ;;
             esac
+            if [ -z "$src" ]; then
+                rm -f "$img"
+            elif [ "$ext" = "svg" ] && [ -f "${src}.svg" ]; then
+                cp -f "${src}.svg" "$img"
+            elif [ -f "${src}.png" ]; then
+                cp -f "${src}.png" "$img"
+            else
+                rm -f "$img"
+            fi
         done
-        cp -f "$HERE/theme/system.png" "$dest/system.png" 2>/dev/null
-        cp -f "$HERE/theme/logo.png" "$dest/logo.png" 2>/dev/null
+        for art in system.png logo.png background_icon.png system.svg logo.svg; do
+            [ -f "$HERE/theme/$art" ] && cp -f "$HERE/theme/$art" "$dest/$art" 2>/dev/null
+        done
         themed=$((themed + 1))
     done
 done
