@@ -190,8 +190,12 @@ class ButtonMap:
         for name, codes in (overrides or {}).items():
             if isinstance(codes, int):
                 codes = [codes]
-            if codes:
+            if not codes or isinstance(codes, str):
+                continue
+            try:
                 self.by_action[name] = [int(c) for c in codes]
+            except (TypeError, ValueError):
+                pass          # a typo in config.json keeps the defaults
         self.by_code = {}
         for action, codes in self.by_action.items():
             for c in codes:
@@ -1629,9 +1633,9 @@ def main(argv=None):
 def run(scr, evs, held, last_input, clawd, friends, shown,
         last_mtime, hist, hist_at, stick_cal=None, buttons=None):
     buttons = buttons or ButtonMap()
-    warn_at = int(CFG.get("warn_pct", 60))
-    crit_at = int(CFG.get("crit_pct", 85))
-    fps = max(5, min(60, int(CFG.get("fps", 20))))
+    warn_at = clawd_config.as_int(CFG, "warn_pct", 60, 1, 100)
+    crit_at = clawd_config.as_int(CFG, "crit_pct", 85, 1, 100)
+    fps = clawd_config.as_int(CFG, "fps", 20, 5, 60)
     trend_steps = (5, 15, 30, 60, 120)  # x2min = 10/30/60/120/240 minutes
     trend_i = 4
     trend_n = trend_steps[trend_i]

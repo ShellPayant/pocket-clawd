@@ -124,9 +124,9 @@ class Beacon:
 
     def __init__(self, cfg):
         self.enabled = bool(cfg.get("discovery", True))
-        self.port = int(cfg.get("discovery_port", 8787))
+        self.port = clawd_config.as_int(cfg, "discovery_port", 8787, 1, 65535)
         self.mode = cfg.get("mode", "push")
-        self.listen_port = int(cfg.get("port", 8788))
+        self.listen_port = clawd_config.as_int(cfg, "port", 8788, 1, 65535)
         self.sock = None
         self.next_send = 0.0
         self.pc_url = None
@@ -229,7 +229,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 def run_push(cfg, beacon):
     Handler.secret = cfg.get("secret", "")
     srv = http.server.HTTPServer((cfg.get("bind", "0.0.0.0"),
-                                  int(cfg.get("port", 8788))), Handler)
+                                  clawd_config.as_int(cfg, "port", 8788, 1, 65535)), Handler)
     srv.timeout = 1.0
     log("listening on %s:%s%s" % (cfg.get("bind", "0.0.0.0"), cfg.get("port"),
                                   " (secret required)" if Handler.secret else ""))
@@ -247,7 +247,7 @@ def http_get_json(url, headers=None, timeout=15):
 
 
 def run_pull(cfg, beacon):
-    every = max(15, int(cfg.get("poll_seconds", 60)))
+    every = clawd_config.as_int(cfg, "poll_seconds", 60, 15, 3600)
     configured = cfg.get("pc_url", "")
     log("pull mode, every %ds%s" % (every, (", from " + configured) if configured
                                     else ", waiting for a pusher to announce itself"))
@@ -381,7 +381,7 @@ def build_payload(usage, rl=0):
 
 
 def run_direct(cfg, beacon):
-    every = max(60, int(cfg.get("poll_seconds", 120)))
+    every = clawd_config.as_int(cfg, "poll_seconds", 120, 60, 3600)
     backoff = 0.0
     log("direct mode, polling Anthropic every %ds" % every)
     while True:

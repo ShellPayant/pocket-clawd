@@ -79,6 +79,20 @@ def load_config():
     return cfg
 
 
+def as_int(cfg, key, default, low=None, high=None):
+    """config.json is hand-edited on a handheld, sometimes over SSH at
+    midnight. A null or a typo'd string should not crash the app."""
+    try:
+        v = int(cfg.get(key, default))
+    except (TypeError, ValueError):
+        v = default
+    if low is not None:
+        v = max(low, v)
+    if high is not None:
+        v = min(high, v)
+    return v
+
+
 def data_path(cfg):
     return cfg.get("data_path") or os.path.join("/tmp", APP + ".json")
 
