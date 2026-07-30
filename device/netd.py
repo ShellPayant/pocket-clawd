@@ -324,18 +324,31 @@ def refresh_token(cfg, tok, path):
 
 
 def fmt_reset(iso):
-    """'2026-07-30T23:00:00Z' -> '23:00' today, 'THU 13:00' otherwise."""
+    """'2026-07-30T23:09:59.461525+00:00' -> '23:09' today, 'THU 13:00' if not.
+
+    The fallback matters more than it looks: fromisoformat is fussy about the
+    number of fractional-second digits on older Pythons, and a handheld can be
+    running anything."""
     if not iso:
         return "?"
     txt = str(iso).replace("Z", "+00:00")
+    local = None
     try:
         import datetime
         dt = datetime.datetime.fromisoformat(txt)
         if dt.tzinfo is not None:
             dt = dt.astimezone()
         local = time.localtime(dt.timestamp())
-    except (ValueError, OverflowError, OSError):
-        return "?"
+    except (ValueError, OverflowError, OSError, ImportError):
+        pass
+    if local is None:
+        try:                       # chop the fraction and the offset, assume UTC
+            import calendar
+            base = txt[:19]
+            local = time.localtime(calendar.timegm(
+                time.strptime(base, "%Y-%m-%dT%H:%M:%S")))
+        except (ValueError, OverflowError, OSError):
+            return "?"
     if time.strftime("%Y%m%d", local) == time.strftime("%Y%m%d"):
         return time.strftime("%H:%M", local)
     return time.strftime("%a %H:%M", local).upper()

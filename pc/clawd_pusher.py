@@ -84,17 +84,26 @@ def read_token():
 # ------------------------------------------------------------- API + fmt ---
 
 def fmt_reset(iso):
-    """'...T23:00:00Z' -> '23:00' if that's today, else 'THU 13:00'."""
+    """'...T23:09:59.461525+00:00' -> '23:09' if that's today, else 'THU 13:00'."""
     if not iso:
         return "?"
+    txt = str(iso).replace("Z", "+00:00")
+    local = None
     try:
         import datetime
-        dt = datetime.datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        dt = datetime.datetime.fromisoformat(txt)
         if dt.tzinfo is not None:
             dt = dt.astimezone()
         local = time.localtime(dt.timestamp())
     except (ValueError, OverflowError, OSError):
-        return "?"
+        pass
+    if local is None:
+        try:                       # chop the fraction and offset, assume UTC
+            import calendar
+            local = time.localtime(calendar.timegm(
+                time.strptime(txt[:19], "%Y-%m-%dT%H:%M:%S")))
+        except (ValueError, OverflowError, OSError):
+            return "?"
     if time.strftime("%Y%m%d", local) == time.strftime("%Y%m%d"):
         return time.strftime("%H:%M", local)
     return time.strftime("%a %H:%M", local).upper()
