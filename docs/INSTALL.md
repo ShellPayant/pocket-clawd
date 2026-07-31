@@ -3,7 +3,7 @@
 Two halves: the app on the console, and something on your PC that knows your
 Claude usage. Do the console first.
 
-Before you start, check the console can run it at all —
+Before you start, check the console can run it at all:
 [docs/COMPATIBILITY.md](COMPATIBILITY.md).
 
 ---
@@ -65,22 +65,22 @@ harmless, and `./install/uninstall.sh` restores it.
 ./install.sh --tools-only       # skip the carousel entry entirely
 ```
 
-Use `--tools-only` on firmware that isn't ArkOS-family — the app still works,
+Use `--tools-only` on firmware that isn't ArkOS-family. The app still works,
 you just launch `/roms/pocketclawd/Pocket Clawd.sh` yourself, or add it to
 whatever menu your firmware uses.
 
 ### If it doesn't appear on the carousel
 
-* **Nothing changed at all** — the installer needs to write to `/etc`. Try
+* **Nothing changed at all.** The installer needs to write to `/etc`. Try
   `sudo ./install.sh`.
-* **Still missing after the restart** — reboot the console properly; some
+* **Still missing after the restart.** Reboot the console properly; some
   builds don't restart EmulationStation cleanly.
-* **Everything else is gone too** — the config file is malformed. Restore it:
+* **Everything else is gone too.** The config file is malformed. Restore it:
   `sudo cp /etc/emulationstation/es_systems.cfg.pocketclawd-backup /etc/emulationstation/es_systems.cfg`
   and open an issue with what happened.
-* **You have "Parse gamelists only" switched on** — the installer writes a
+* **You have "Parse gamelists only" switched on.** The installer writes a
   `gamelist.xml`, so this should be handled, but check Start → Advanced.
-* **It vanished after a firmware update** — some ArkOS updates replace
+* **It vanished after a firmware update.** Some ArkOS updates replace
   `es_systems.cfg` wholesale. Run `./install.sh` again.
 
 ## 3. Start the PC side
@@ -95,7 +95,7 @@ python pc/clawd_pusher.py
 
 Within a few seconds it should say `found a console at http://...`, and the
 console's bars fill in. If it doesn't, see
-[docs/NETWORKING.md](NETWORKING.md) — the short version is
+[docs/NETWORKING.md](NETWORKING.md). The short version is
 `python pc/clawd_pusher.py --device <console-ip>`.
 
 Leave it running. Closing the window stops the updates; the console will show
@@ -109,16 +109,16 @@ python pc/sync-token.py <console-ip>
 
 then set `"mode": "direct"` in `/roms/pocketclawd/app/config.json`. The console
 then talks to Anthropic by itself, anywhere it has internet. Read the direct-mode
-section of [docs/NETWORKING.md](NETWORKING.md) first — it puts a token on the SD
+section of [docs/NETWORKING.md](NETWORKING.md) first. It puts a token on the SD
 card, and there are consequences to that.
 
 ## 4. Make it yours
 
 Everything worth changing is a plain file in `/roms/pocketclawd/app/`:
 
-* `quips.txt` — the things Clawd says. One per line.
-* `anthem.wav` — what L2 plays. Any `anthem.mp3` / `.ogg` / `.opus` replaces it.
-* `config.json` — thresholds, button codes, network mode.
+* `quips.txt`: the things Clawd says. One per line.
+* `anthem.wav`: what L2 plays. Any `anthem.mp3` / `.ogg` / `.opus` replaces it.
+* `config.json`: thresholds, button codes, network mode.
 
 Changes take effect next time you launch it.
 

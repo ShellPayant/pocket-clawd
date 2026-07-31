@@ -8,7 +8,7 @@ The chip in the top-left corner tells you which mode is actually running.
 
 ---
 
-## push — a PC sends the numbers (default)
+## push: a PC sends the numbers (default)
 
 ```
  your PC                              the console
@@ -28,8 +28,8 @@ python pc/clawd_pusher.py --device 192.168.1.42
 ```
 
 **Locking it down.** By default anything on your network can POST numbers to
-the console. On a home network that is a nuisance at worst — the only thing it
-can do is show you wrong percentages — but if you'd rather not:
+the console. On a home network that is a nuisance at worst, since the only
+thing it can do is show you wrong percentages, but if you'd rather not:
 
 ```jsonc
 // console: config.json
@@ -43,7 +43,7 @@ You can also bind it to one interface with `"bind": "192.168.1.42"`.
 
 ---
 
-## pull — the console fetches instead
+## pull: the console fetches instead
 
 ```
  your PC                              the console
@@ -70,11 +70,11 @@ Discovery still does the introductions: the console announces itself, the
 pusher replies with its own address, and the console starts fetching. Set
 `"pc_url": "http://192.168.1.10:8789/usage.json"` to skip that.
 
-Note this mode needs the **Python** pusher — the PowerShell one only pushes.
+Note this mode needs the **Python** pusher. The PowerShell one only pushes.
 
 ---
 
-## direct — no PC at all
+## direct: no PC at all
 
 ```
  the console
@@ -113,7 +113,7 @@ python pc/sync-token.py 192.168.1.42          # copies it over SSH
 
 ---
 
-## hotspot — when your home WiFi won't work
+## hotspot: when your home WiFi won't work
 
 Not a data mode; a way to get the console onto a network at all.
 
@@ -134,7 +134,7 @@ On Linux, `nmcli device wifi hotspot ssid pocket-clawd password something`
 does the same job. macOS has Internet Sharing in System Settings, though it
 can't be scripted.
 
-Once connected this is ordinary **push** mode — the hotspot is only about the
+Once connected this is ordinary **push** mode. The hotspot is only about the
 link.
 
 > Windows may also stop the hotspot five minutes after the last client
@@ -179,7 +179,7 @@ last part of each path is ever sent -- your home directory stays on your
 machine. `sessions` is the same names as a plain string, kept so an older
 console still works.
 
-Percentages, reset times, and the names of the projects you have open — those
+Percentages, reset times, and the names of the projects you have open. Those
 last two are what the aquarium friends and their signs are made of. No prompts,
 no code, no token. Check for yourself with:
 
@@ -196,7 +196,7 @@ lines and trimmed on startup.
 | What you see | Usually means |
 |---|---|
 | `WAITING FOR USAGE DATA` | The pusher isn't running, or hasn't found the console. Check its window for `found a console at ...`. |
-| `(STALE!)` next to the time | Data arrived once but has stopped. The link dropped — on WiFi after sleep, reconnecting the console usually fixes it. |
+| `(STALE!)` next to the time | Data arrived once but has stopped. The link dropped. On WiFi after sleep, reconnecting the console usually fixes it. |
 | Clawd asleep with Zs | Nothing for ten minutes. Same causes as above. |
 | The 429 pet | Anthropic is rate-limiting the usage endpoint. Nothing is broken; it backs off for five minutes and the numbers stay as they were. |
 | `credentials rejected` | Log in with Claude Code again on the PC. |

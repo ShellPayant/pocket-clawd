@@ -2,7 +2,7 @@
 
 Pocket Clawd needs three things from a handheld:
 
-1. **`python3`** — no packages, just the interpreter. Several popular firmwares
+1. **`python3`**, no packages, just the interpreter. Several popular firmwares
    don't ship one at all.
 2. **A writable `/dev/fb0`** at **32 bits per pixel**. It draws by copying raw
    bytes into the framebuffer; there is no SDL, no OpenGL, no compositor.
@@ -29,12 +29,12 @@ verdict    : supported, pixel for pixel
 
 | Device | Screen | Firmware |
 |---|---|---|
-| **"R36S" / K36 / R35S / R33S clones** | 640x480 | ArkOS4Clone — this is the one it was built on |
+| **"R36S" / K36 / R35S / R33S clones** | 640x480 | ArkOS4Clone. This is the one it was built on |
 
 That's the honest list: one device family, personally tested. Everything below
 is reasoning from specifications, not from having run it.
 
-## Should work — same shape, untested
+## Should work: same shape, untested
 
 640x480 and a firmware with python3 and fbdev:
 
@@ -47,7 +47,7 @@ is reasoning from specifications, not from having run it.
 | Anbernic RG40XX H / V | H700 | Knulli, Batocera |
 | Miyoo Flip | A133P | spruceOS (ships its own python3) |
 
-If you try one, I'd genuinely like to know — open an issue with the output of
+If you try one, I'd genuinely like to know. Open an issue with the output of
 `--panel-info` either way.
 
 ## Should work, letterboxed
@@ -67,23 +67,23 @@ deliberate rather than broken, and everything works:
 
 ## Won't work (yet)
 
-**Screens smaller than 640x480** — RG351P, RG351M, Powkiddy RGB10/RGB20, ODROID
+**Screens smaller than 640x480.** RG351P, RG351M, Powkiddy RGB10/RGB20, ODROID
 Go Advance, all 480x320. The app detects this and says so instead of drawing
 garbage:
 
 ![the unsupported-panel screen](screenshots/unsupported.png)
 
 Making these work means a genuinely different layout rather than a scaling
-factor — the panels are 44% of the pixels. It's the obvious next thing to build
+factor, since the panels are 44% of the pixels. It's the obvious next thing to build
 if people want it.
 
-**Panels that aren't 32 bits per pixel** — 16-bit RGB565 is common on SigmaStar
+**Panels that aren't 32 bits per pixel.** 16-bit RGB565 is common on SigmaStar
 devices (Miyoo Mini). Doable, and cheaper than the small-screen work: it's a
 pixel conversion in one function.
 
-**Firmwares with no python3** — muOS (unless you add it), OnionOS, MinUI.
+**Firmwares with no python3.** muOS (unless you add it), OnionOS, MinUI.
 
-**Android handhelds** — Retroid, RG406H and friends. Different world entirely.
+**Android handhelds.** Retroid, RG406H and friends. Different world entirely.
 
 ## Notes on particular firmwares
 
@@ -92,19 +92,19 @@ writable filesystem, and the installer's carousel step works exactly as
 designed. SSH is off until you switch on Remote Services in the Options menu.
 
 **ROCKNIX.** Ships Python 3.13 and a 640x480 BGRX framebuffer, so the app
-itself should be fine — and it needs no packages, which matters because
+itself should be fine, and it needs no packages, which matters because
 ROCKNIX's `/usr` is read-only with no `pip`. The installer's carousel step won't
 apply as written: ROCKNIX regenerates its EmulationStation config at boot.
 Install with `./install.sh --tools-only` and launch the script directly.
 
 **Batocera / Knulli.** python3 and fbdev are present and SSH is on by default
 (`root` / `linux` on Batocera). These use a different mechanism for adding
-systems — a drop-in `es_systems_*.cfg` rather than editing the main file — so
+systems, a drop-in `es_systems_*.cfg` rather than editing the main file, so
 again, `--tools-only` and add the entry yourself.
 
 **Anything mainline-kernel on RK3566/RK3588.** `/dev/fb0` there is emulated on
 top of DRM. It usually exists, but check with `--panel-info` before assuming,
-and stop EmulationStation first — if something else holds the display, writes
+and stop EmulationStation first. If something else holds the display, writes
 may be ignored or torn.
 
 ## Buttons

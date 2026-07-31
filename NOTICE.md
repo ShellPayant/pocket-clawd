@@ -1,18 +1,18 @@
 # Third-party material
 
-Pocket Clawd itself is MIT licensed — see [LICENSE](LICENSE). One part of it
+Pocket Clawd itself is MIT licensed, see [LICENSE](LICENSE). One part of it
 isn't mine.
 
 ## The pets in the fish tank
 
 The little Clawds that wander around the aquarium, one per active Claude Code
 session, come from **[clawd-pet](https://github.com/abderrahimghazali/clawd-pet)**
-by **[@abderrahimghazali](https://github.com/abderrahimghazali)** — a collection
+by **[@abderrahimghazali](https://github.com/abderrahimghazali)**: a collection
 of 90-odd animated pixel-art Clawd SVGs, MIT licensed.
 
 * The original SVGs are in [`assets/pets-svg/`](assets/pets-svg/), unmodified,
   alongside the author's own [`LICENSE`](assets/pets-svg/LICENSE).
-* The files in `device/pets/` are **derived from those SVGs** — rendered to
+* The files in `device/pets/` are **derived from those SVGs**, rendered to
   fixed-size BGRA sprites by [`tools/bake_pets.py`](tools/bake_pets.py), because
   the console has no SVG renderer. The same MIT licence covers them.
 
@@ -38,16 +38,16 @@ mine.
 ## The anthem
 
 `device/anthem.wav` is an original chiptune synthesised from arithmetic by
-`tools/bake_chiptune.py` — no samples, nothing borrowed.
+`tools/bake_chiptune.py`. No samples, nothing borrowed.
 
 The track this was really built to play is **Claude's Plan** by **Jeff Guo**
 ([YouTube](https://www.youtube.com/watch?v=9kT0oLBPiOw)). It isn't bundled, to
-keep the repo small — drop your own copy in as `anthem.mp3` and it takes over.
+keep the repo small. Drop your own copy in as `anthem.mp3` and it takes over.
 
 ## What's mine
 
 Everything else: the dashboard, the meters, the trend chart, the aquarium, the
-network daemon, the pushers, the installer, and the big crab — which is drawn
+network daemon, the pushers, the installer, and the big crab, which is drawn
 in code, pixel by pixel, in `clawd.py`. The bitmap font is hand-built in the
 same file. The anthem is synthesised from arithmetic by
 [`tools/bake_chiptune.py`](tools/bake_chiptune.py).
