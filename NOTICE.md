@@ -35,6 +35,15 @@ re-running the baker is all it takes to add it.
 `assets/pets-svg/LICENSE` with them.** The artwork is that author's work, not
 mine.
 
+## The anthem
+
+`device/anthem.wav` is an original chiptune synthesised from arithmetic by
+`tools/bake_chiptune.py` — no samples, nothing borrowed.
+
+The track this was really built to play is **Claude's Plan** by **Jeff Guo**
+([YouTube](https://www.youtube.com/watch?v=9kT0oLBPiOw)). It isn't bundled, to
+keep the repo small — drop your own copy in as `anthem.mp3` and it takes over.
+
 ## What's mine
 
 Everything else: the dashboard, the meters, the trend chart, the aquarium, the

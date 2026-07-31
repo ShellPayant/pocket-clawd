@@ -16,7 +16,7 @@ token.json
 usage_hist.jsonl
 *.jsonl.tmp
 
-# personal audio dropped in to replace the anthem
+# a user's own replacement audio -- the shipped default is anthem.wav
 device/anthem.mp3
 device/anthem.ogg
 device/anthem.opus

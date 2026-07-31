@@ -1434,13 +1434,41 @@ def play_song():
         song = find_song()
         if not song:
             return "missing"
-        if os.name == "nt" and song.lower().endswith(".wav"):
+        if os.name == "nt":
+            if song.lower().endswith(".wav"):
+                try:
+                    import winsound
+                    winsound.PlaySound(song,
+                                       winsound.SND_FILENAME | winsound.SND_ASYNC)
+                    return "ok"
+                except (ImportError, RuntimeError):
+                    return "noplayer"
+            # winsound is WAV-only; MCI handles mp3 and is also stdlib
             try:
-                import winsound
-                winsound.PlaySound(song, winsound.SND_FILENAME | winsound.SND_ASYNC)
+                import ctypes
+                mci = ctypes.windll.winmm.mciSendStringW
+                mci("close clawdsong", None, 0, 0)
+                if mci('open "%s" alias clawdsong' % song, None, 0, 0) == 0:
+                    mci("play clawdsong", None, 0, 0)
+                    return "ok"
+            except (OSError, AttributeError):
+                pass
+            return "noplayer"
+        # elsewhere the desktop can use the same players the console does
+        for exe, args in PLAYERS:
+            path = shutil.which(exe)
+            if not path:
+                continue
+            if exe == "aplay" and not song.lower().endswith(".wav"):
+                continue
+            try:
+                _song_proc[0] = subprocess.Popen(
+                    [path] + args + [song],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True)
                 return "ok"
-            except (ImportError, RuntimeError):
-                return "noplayer"
+            except OSError:
+                continue
         return "noplayer"
     proc = _song_proc[0]
     if proc is not None and proc.poll() is None:

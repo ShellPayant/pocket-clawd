@@ -136,13 +136,13 @@ Two words get animated whenever he says them:
 Everything worth changing is a plain file you can edit on the card:
 
 * **`quips.txt`** — everything Clawd says, one line each. This is the whole feature; write your own.
-* **`anthem.wav`** — what L2 plays. Drop in any audio file named `anthem.*` (mp3, ogg, wav…) and
-  it takes over. The one included is an original chiptune generated from arithmetic by
-  `tools/bake_chiptune.py`, so it's free to pass on.
+* **`anthem.wav`** — what L2 plays. Drop in any file named `anthem.*` (mp3, ogg, wav…) and yours
+  takes over. The one included is an original chiptune from `tools/bake_chiptune.py`.
 
-  If you want the one I actually use: **[Claude's Plan by Jeff Guo](https://www.youtube.com/watch?v=9kT0oLBPiOw)**.
-  It isn't in this repo because it's his, not mine — grab your own copy and save it as
-  `anthem.mp3` in the app folder.
+  The track this was really built to play is
+  **[Claude's Plan by Jeff Guo](https://www.youtube.com/watch?v=9kT0oLBPiOw)** — not bundled, to
+  keep the download small. Save your own copy as `anthem.mp3` in the app folder and it takes over
+  automatically.
 * **`config.json`** — thresholds, button codes, how it gets its data. Every setting is optional.
 
 `python tools/sim.py` renders any state to a picture without a console attached —
