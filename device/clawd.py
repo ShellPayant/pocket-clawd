@@ -304,6 +304,7 @@ class Screen:
         self.page = 0
         self.var = None
         self.out = None                   # device-sized compose buffer, if needed
+        self.on_frame = None              # live viewer callback (desktop app)
         self.ox = self.oy = 0
         self.plain = plain
         if SIM:
@@ -541,7 +542,14 @@ class Screen:
 
     def flush(self):
         if SIM:
-            self.frames.append(bytes(self._compose()))
+            frame = bytes(self._compose())
+            if self.on_frame is not None:
+                # a live viewer (the desktop app) takes each frame as it comes;
+                # accumulating them all is what the GIF path wants, but at
+                # 640x480x4 it costs ~1.2MB a frame and would grow forever
+                self.on_frame(frame, self.frame_size)
+            else:
+                self.frames.append(frame)
             return
         data = self._compose()
         if self.pages > 1:
@@ -972,6 +980,15 @@ def clawd_bounds(sc):
         lo = hi = (AQ_IN_X0 + AQ_IN_X1) // 2 - 10 * sc
     return float(lo), float(hi)
 
+
+# Actions pushed in from outside the gamepad -- the desktop app's keyboard
+# handler appends here and the run loop drains it. Empty and unused on the
+# console, which reads /dev/input directly.
+INJECTED = []
+
+# What the bottom-right corner tells you to press. The desktop app overrides
+# this, because it has no SELECT or START.
+EXIT_HINT = "SELECT+START = EXIT"
 
 VISITOR_GAP = (14.0, 26.0)      # seconds between visitors
 _visitor_bag = []
@@ -1412,7 +1429,19 @@ def play_song():
     """Anthem toggle. Returns 'ok', 'stopped', 'cooldown', 'missing'
     or 'noplayer'."""
     if SIM:
-        return "missing"
+        # the desktop app runs in SIM mode but is a real thing someone is
+        # looking at, so play it if the platform gives us a way
+        song = find_song()
+        if not song:
+            return "missing"
+        if os.name == "nt" and song.lower().endswith(".wav"):
+            try:
+                import winsound
+                winsound.PlaySound(song, winsound.SND_FILENAME | winsound.SND_ASYNC)
+                return "ok"
+            except (ImportError, RuntimeError):
+                return "noplayer"
+        return "noplayer"
     proc = _song_proc[0]
     if proc is not None and proc.poll() is None:
         try:
@@ -1864,6 +1893,10 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
     title_anim_start = time.time()
     next_title_anim = title_anim_start + 300
     sim_left = int(os.environ.get("CLAWD_SIM_FRAMES", "80")) if SIM else -1
+    # 0 means run until something stops us -- what a live viewer wants. Decided
+    # once, before the loop: deriving it from the counter each pass makes the
+    # countdown turn into "forever" the moment it reaches zero.
+    sim_forever = SIM and sim_left == 0
     visitor = [None]
     # the first one turns up quickly, so a fresh launch shows what this is
     next_visitor = [time.time() + 5.0]
@@ -1872,7 +1905,7 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
     sim_action_at = int(sim_left * 0.75) if sim_left > 0 else -1
     netd_check = 0.0
     while True:
-        if SIM:
+        if SIM and not sim_forever:
             if sim_left <= 0:
                 return
             sim_left -= 1
@@ -2013,7 +2046,7 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
         if stale:
             status += " (STALE!)"
         scr.text(48, 466, status, BAD if stale else DIM, 1)
-        hint = "SELECT+START = EXIT"
+        hint = EXIT_HINT
         scr.text(W - 48 - scr.text_w(hint, 1), 466, hint, DIM, 1)
         scr.flush()
 
@@ -2060,6 +2093,12 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
         # lets a preview show what a button actually does.
         if SIM and sim_action and sim_left == sim_action_at:
             fire(sim_action)
+        while INJECTED:
+            act = INJECTED.pop(0)
+            if act == "quit":
+                return
+            last_input = time.time()
+            fire(act)
         r = select.select(evs, [], [], 0.01)[0] if evs else []
         for f in r:
             for etype, code, value in read_events(f):

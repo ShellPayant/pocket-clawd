@@ -7,7 +7,8 @@ cheap handheld games console sitting on your desk, so you can glance at it inste
 check. There is also a crab. He lives in a fish tank at the bottom of the screen and gets visibly
 worried as your usage climbs.
 
-It's a hobby project, it's free, and it runs on a console that costs about £40.
+It's a hobby project, it's free, and it runs on a console that costs about £40 —
+**or in a window on your computer, if you haven't got one.**
 
 ---
 
@@ -23,6 +24,18 @@ actually working right now looks busy rather than asleep.
 Every so often another pet drifts through with its name on it. There are 21 of them and most are
 tied to situations you'd rather avoid, so this is the only way you'll meet the one that turns up
 when your login expires.
+
+## Haven't got a handheld?
+
+```sh
+python desktop/clawd_desktop.py
+```
+
+The same display, in a window, reading your usage directly — no console, no
+network setup, nothing to configure. Add `--demo` to see it working before you
+even log in to anything.
+
+![Pocket Clawd running in a window on a desktop](docs/img/desktop.png)
 
 ## What you need
 
@@ -109,8 +122,9 @@ Everything worth changing is a plain file you can edit on the card:
   original and free to pass on.
 * **`config.json`** — thresholds, button codes, how it gets its data. Every setting is optional.
 
-And if you don't own a handheld, `python tools/sim.py` runs the whole thing on your computer and
-saves it as a picture. That's how every screenshot here was made.
+`python tools/sim.py` renders any state to a picture without a console attached —
+that's how every screenshot here was made — and `python desktop/clawd_desktop.py`
+runs it live in a window.
 
 ## Credits
 

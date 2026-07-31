@@ -44,18 +44,79 @@ MUTED = (176, 174, 165)      # cloud-medium  #B0AEA5
 HAIR = (204, 203, 200)       # hairline      #CCCBC8
 CLAY = (217, 119, 87)        # clay          #D97757  -- one element only
 
-WIN = r"C:\Windows\Fonts"
-SERIF = os.path.join(WIN, "georgia.ttf")
-SERIF_B = os.path.join(WIN, "georgiab.ttf")
-SERIF_I = os.path.join(WIN, "georgiai.ttf")
-SANS = os.path.join(WIN, "seguisb.ttf")
-SANS_R = os.path.join(WIN, "segoeui.ttf")
+# Typeface, in preference order per role. Anthropic's own declared fallback
+# stack is "Anthropic Serif", Georgia / "Anthropic Sans", Arial -- so Georgia
+# is not a guess, it is the sanctioned substitute. On Linux and macOS it won't
+# exist, hence the ladders: a transitional serif then whatever is installed.
+FONT_DIRS = [
+    r"C:\Windows\Fonts",
+    "/usr/share/fonts", "/usr/local/share/fonts",
+    os.path.expanduser("~/.fonts"), os.path.expanduser("~/.local/share/fonts"),
+    "/Library/Fonts", "/System/Library/Fonts",
+    os.path.expanduser("~/Library/Fonts"),
+]
+
+FONT_SETS = {
+    "serif":   ["georgia.ttf", "Georgia.ttf", "constan.ttf",
+                "Charter.ttc", "Times New Roman.ttf",
+                "NewsreaderText-Regular.ttf", "SourceSerif4-Regular.ttf",
+                "Lora-Regular.ttf", "LiberationSerif-Regular.ttf",
+                "DejaVuSerif.ttf", "NotoSerif-Regular.ttf"],
+    "serif_i": ["georgiai.ttf", "Georgia Italic.ttf", "constani.ttf",
+                "LiberationSerif-Italic.ttf", "DejaVuSerif-Italic.ttf",
+                "NotoSerif-Italic.ttf"],
+    "sans":    ["seguisb.ttf", "SegoeUI-Semibold.ttf", "Arial Bold.ttf",
+                "Inter-SemiBold.ttf", "LiberationSans-Bold.ttf",
+                "DejaVuSans-Bold.ttf", "NotoSans-Bold.ttf"],
+    "sans_r":  ["segoeui.ttf", "SegoeUI.ttf", "Arial.ttf", "Helvetica.ttc",
+                "Inter-Regular.ttf", "LiberationSans-Regular.ttf",
+                "DejaVuSans.ttf", "NotoSans-Regular.ttf"],
+}
+
+_font_cache = {}
 
 
-def font(path, size):
+def _find_font_file(names):
+    for name in names:
+        for d in FONT_DIRS:
+            if not os.path.isdir(d):
+                continue
+            direct = os.path.join(d, name)
+            if os.path.exists(direct):
+                return direct
+            # Linux buries fonts in per-family subdirectories
+            for root, _dirs, files in os.walk(d):
+                if name in files:
+                    return os.path.join(root, name)
+    return None
+
+
+def font_path(role):
+    if role not in _font_cache:
+        found = _find_font_file(FONT_SETS[role])
+        if found is None:
+            print("warning: no %s font found. The artwork will be rendered with\n"
+                  "         Pillow's bitmap default and will look wrong. Install\n"
+                  "         one of: %s"
+                  % (role, ", ".join(FONT_SETS[role][:4])), file=sys.stderr)
+        _font_cache[role] = found
+    return _font_cache[role]
+
+
+SERIF, SERIF_I, SANS, SANS_R = "serif", "serif_i", "sans", "sans_r"
+
+
+def font(role, size):
+    path = font_path(role)
+    if path:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            pass
+    # last resort: legible, but the layout is designed around a real face
     try:
-        return ImageFont.truetype(path, size)
-    except OSError:
+        return ImageFont.load_default(size)
+    except TypeError:               # Pillow < 9.2 has no size argument
         return ImageFont.load_default()
 
 

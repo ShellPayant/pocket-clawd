@@ -33,3 +33,6 @@ desktop.ini
 # docs/img/console.png ships, the original does not
 WhatsApp*
 *.jpeg
+
+# desktop app state (lives in the OS app-data dir anyway)
+pocket-clawd-desktop/
