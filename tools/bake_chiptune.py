@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Synthesise the anthem: an original chiptune, built from arithmetic.
+"""Synthesise the default anthem: an original chiptune, built from arithmetic.
 
 L2 plays an audio file. The obvious thing to ship is a song you like, which is
-the one thing a public repo can't do -- so this writes one instead. Square-wave
-lead, pulse bass, noise percussion, no samples and no dependencies, which makes
-it unambiguously ours to give away.
+the one thing a public repo can't do -- so this writes one instead. Square and
+triangle waves, noise percussion, no samples and no dependencies, which makes it
+unambiguously ours to give away.
 
-    python tools/bake_chiptune.py            # device/anthem.wav
+    python tools/bake_chiptune.py              # device/anthem.wav
     python tools/bake_chiptune.py --bpm 150
+    python tools/bake_chiptune.py --loops 3    # longer
 
-Drop any .ogg/.mp3/.wav named anthem.* into the app folder to replace it.
+Want a different one? Drop any file named anthem.mp3 / .ogg / .wav into the app
+folder and it takes over -- see the README.
 """
 import argparse
 import math
@@ -22,32 +24,42 @@ import wave
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RATE = 22050
 
-# A minor pentatonic, which is hard to make sound wrong.
-A3, C4, D4, E4, G4, A4, C5, D5, E5, G5, A5 = (
-    220.00, 261.63, 293.66, 329.63, 392.00, 440.00,
-    523.25, 587.33, 659.25, 783.99, 880.00)
-
-# (frequency, beats). None is a rest.
-LEAD = [
-    (A4, 1), (C5, 1), (E5, 1), (D5, 1),
-    (C5, 1), (A4, 1), (G4, 2),
-    (A4, 1), (C5, 1), (E5, 1), (G5, 1),
-    (A5, 2), (E5, 1), (D5, 1),
-    (C5, 1), (E5, 1), (D5, 1), (C5, 1),
-    (A4, 2), (None, 1), (G4, 1),
-    (A4, 1), (E4, 1), (A4, 1), (C5, 1),
-    (A4, 4),
-]
-BASS = [
-    (A3, 2), (A3, 2), (G4 / 2, 2), (G4 / 2, 2),
-    (A3, 2), (A3, 2), (C4, 2), (E4, 2),
-    (A3, 2), (A3, 2), (G4 / 2, 2), (G4 / 2, 2),
-    (D4, 2), (D4, 2), (A3, 4),
-]
+# note -> Hz, two octaves of A minor. Written as names so the tune below is
+# readable as music rather than as a list of frequencies.
+BASE = {"A": 220.00, "B": 246.94, "C": 261.63, "D": 293.66,
+        "E": 329.63, "F": 349.23, "G": 392.00}
 
 
-def envelope(i, n, attack=0.01, release=0.25):
-    """Quick attack, slow release -- the classic plucked chip sound."""
+def hz(note):
+    """'A4' -> 440.0, 'C5' -> 523.25, '-' -> rest."""
+    if note in ("-", None):
+        return None
+    letter, octave = note[0], int(note[1])
+    f = BASE[letter] * (2 ** (octave - 3))
+    if len(note) > 2 and note[2] == "#":
+        f *= 2 ** (1 / 12.0)
+    return f
+
+
+# (notes, beats each) -- eighth notes at the given bpm
+HOOK = ["A4", "-", "C5", "E5", "D5", "C5", "A4", "-",
+        "A4", "C5", "E5", "G5", "A5", "-", "E5", "D5"]
+VERSE = ["C5", "E5", "D5", "C5", "A4", "-", "G4", "A4",
+         "C5", "-", "A4", "G4", "E4", "-", "-", "-"]
+LIFT = ["E5", "G5", "A5", "G5", "E5", "D5", "C5", "D5",
+        "E5", "G5", "A5", "C6", "B5", "A5", "G5", "E5"]
+
+BASS_A = ["A2", "-", "A3", "-", "G2", "-", "G3", "-"]
+BASS_B = ["F2", "-", "F3", "-", "E2", "-", "E3", "-"]
+BASS_C = ["C3", "-", "C3", "G2", "D3", "-", "D3", "A2"]
+
+ARP_AM = ["A4", "C5", "E5", "C5"]
+ARP_G = ["G4", "B4", "D5", "B4"]
+ARP_F = ["F4", "A4", "C5", "A4"]
+ARP_C = ["C5", "E5", "G5", "E5"]
+
+
+def envelope(i, n, attack=0.008, release=0.30):
     a = max(1, int(n * attack))
     r = max(1, int(n * release))
     if i < a:
@@ -57,64 +69,107 @@ def envelope(i, n, attack=0.01, release=0.25):
     return 1.0
 
 
-def square(freq, n, duty=0.5, vol=0.5):
+def square(freq, n, duty=0.5, vol=0.5, vibrato=0.0):
+    """A pulse wave. Duty changes the character completely: 0.5 is hollow and
+    flutey, 0.25 is nasal and cuts through, 0.125 is thin and reedy."""
     out = [0.0] * n
     if not freq:
         return out
-    period = RATE / freq
+    phase = 0.0
     for i in range(n):
-        phase = (i % period) / period
-        s = 1.0 if phase < duty else -1.0
-        out[i] = s * vol * envelope(i, n)
+        f = freq
+        if vibrato:
+            f *= 1.0 + vibrato * math.sin(2 * math.pi * 5.5 * i / RATE)
+        phase += f / RATE
+        out[i] = (1.0 if (phase % 1.0) < duty else -1.0) * vol * envelope(i, n)
     return out
 
 
-def noise(n, vol=0.25, decay=12.0):
-    rnd = random.Random(7)          # fixed seed: the file is reproducible
-    return [(rnd.random() * 2 - 1) * vol * math.exp(-decay * i / n)
-            for i in range(n)]
+def triangle(freq, n, vol=0.5):
+    """Softer than a square -- the bass, so it doesn't fight the lead."""
+    out = [0.0] * n
+    if not freq:
+        return out
+    for i in range(n):
+        p = (i * freq / RATE) % 1.0
+        out[i] = (4 * abs(p - 0.5) - 1) * vol * envelope(i, n, release=0.15)
+    return out
 
 
-def render(bpm):
-    beat = 60.0 / bpm / 2            # eighth notes
-    total = int(sum(b for _f, b in LEAD) * beat * RATE) + RATE // 2
+def noise(n, vol=0.25, decay=14.0, tone=1.0):
+    rnd = random.Random(11)          # fixed seed: the file is reproducible
+    out, last = [0.0] * n, 0.0
+    for i in range(n):
+        v = rnd.random() * 2 - 1
+        last = last + (v - last) * tone      # low-pass -> kick vs hat
+        out[i] = last * vol * math.exp(-decay * i / n)
+    return out
+
+
+def render(bpm, loops):
+    beat = 60.0 / bpm / 2                    # eighth note
+    step = int(beat * RATE)
+
+    # arrangement: intro on the hook, verse, hook, lift, hook
+    lead = HOOK + VERSE + HOOK + LIFT + HOOK
+    lead = lead * max(1, loops)
+    total = len(lead) * step + RATE // 2
     buf = [0.0] * total
 
-    def lay(track, duty, vol, offset=0):
-        pos = offset
-        for freq, beats in track:
-            n = int(beats * beat * RATE)
-            if freq:
-                for i, s in enumerate(square(freq, n, duty, vol)):
-                    if pos + i < total:
-                        buf[pos + i] += s
-            pos += n
+    def lay(samples, at):
+        for i, s in enumerate(samples):
+            j = at + i
+            if j < total:
+                buf[j] += s
 
-    lay(LEAD, 0.5, 0.34)
-    lay(LEAD, 0.5, 0.12, int(0.012 * RATE))   # slight detune-by-delay, fatter
-    lay(BASS, 0.25, 0.30)
+    # lead, doubled a hair late and quieter for width
+    for k, note in enumerate(lead):
+        f = hz(note)
+        if f:
+            lay(square(f, int(step * 1.7), 0.5, 0.30, vibrato=0.004), k * step)
+            lay(square(f, int(step * 1.6), 0.25, 0.10), k * step + int(0.011 * RATE))
 
-    # percussion on every beat, with a louder hit on the downbeat
-    step = int(beat * RATE)
-    for k in range(0, total - step, step):
-        hit = noise(step // 3, 0.22 if (k // step) % 4 == 0 else 0.10)
-        for i, s in enumerate(hit):
-            if k + i < total:
-                buf[k + i] += s
+    # bass, two bars per pattern
+    bass = (BASS_A + BASS_B + BASS_A + BASS_C) * (len(lead) // 32 + 1)
+    for k, note in enumerate(bass[:len(lead)]):
+        f = hz(note)
+        if f:
+            lay(triangle(f, int(step * 1.9), 0.34), k * step)
+
+    # arpeggio underneath, one chord per bar
+    chords = [ARP_AM, ARP_G, ARP_F, ARP_C]
+    for bar in range(len(lead) // 8 + 1):
+        arp = chords[bar % len(chords)]
+        for k in range(8):
+            f = hz(arp[k % len(arp)])
+            at = (bar * 8 + k) * step
+            if at < total and f:
+                lay(square(f * 2, int(step * 0.8), 0.125, 0.075), at)
+
+    # drums: kick on 1 and 3, snare on 2 and 4, hats on eighths
+    for k in range(len(lead)):
+        at = k * step
+        if k % 8 in (0, 3):
+            lay(noise(step, 0.30, 26.0, tone=0.06), at)          # kick
+        if k % 8 in (4,):
+            lay(noise(step // 2, 0.22, 16.0, tone=0.5), at)      # snare
+        if k % 2 == 1:
+            lay(noise(step // 5, 0.06, 30.0, tone=1.0), at)      # hat
 
     peak = max(0.0001, max(abs(s) for s in buf))
-    gain = 0.85 / peak
+    gain = 0.86 / peak
     return [int(max(-32767, min(32767, s * gain * 32767))) for s in buf]
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--bpm", type=int, default=132)
+    ap.add_argument("--bpm", type=int, default=136)
+    ap.add_argument("--loops", type=int, default=1)
     ap.add_argument("--out", default=os.path.join(ROOT, "device", "anthem.wav"))
     args = ap.parse_args()
 
-    samples = render(args.bpm)
+    samples = render(args.bpm, args.loops)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with wave.open(args.out, "wb") as w:
         w.setnchannels(1)

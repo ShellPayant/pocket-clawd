@@ -35,6 +35,8 @@ The same display, in a window, reading your usage directly — no console, no
 network setup, nothing to configure. Add `--demo` to see it working before you
 even log in to anything.
 
+Needs `pip install pillow`, plus `sudo apt install python3-tk` on Linux.
+
 ![Pocket Clawd running in a window on a desktop](docs/img/desktop.png)
 
 ## What you need
@@ -45,9 +47,9 @@ even log in to anything.
 | **Claude Code** | Already installed and logged in on your computer. That's where the numbers come from. |
 | **A network** | Both on the same WiFi is easiest. There are other ways, including one that needs no computer at all. |
 
-Nothing to install on either side beyond the files in this repo — no Python packages, no
-dependencies. A lot of handheld firmware ships a locked-down filesystem, so everything here is
-written to work without installing anything.
+Nothing to install on the console or for the pusher — standard library only, because a lot of
+handheld firmware ships a locked-down filesystem with no way to add packages. (The optional desktop
+window is the one exception: it needs `pillow`, and `python3-tk` on Linux.)
 
 ## How it works
 
@@ -59,16 +61,31 @@ code, no login details. You can see exactly what gets sent by running it with `-
 
 ## Install
 
-**1. Put the files on the console's SD card.** Either copy the folder across with the card in your
-computer, or over the network if you've turned on SSH:
+**1. Download it.** Grab the zip from
+[Releases](https://github.com/ShellPayant/pocket-clawd/releases/latest) and unzip it, or:
 
 ```sh
-scp -r pocket-clawd ark@<console-ip>:/roms/
+git clone https://github.com/ShellPayant/pocket-clawd.git
 ```
 
-**2. Run the installer, on the console:**
+**2. Get the console onto your WiFi** — on ArkOS that's *Options → WiFi Settings*. While you're
+there, turn on **Remote Services** (also under Options); that's SSH, and it's how you'll copy files
+across. The console shows its IP address in the same WiFi menu.
+
+**3. Copy the folder onto the console.** Either put the SD card in your computer and drop the
+`pocket-clawd` folder onto the big partition (the one with your games on it), or over the network:
 
 ```sh
+scp -r pocket-clawd ark@192.168.1.42:/roms/
+```
+
+Use the IP address from step 2. The username is `ark` and, on a stock ArkOS install, so is the
+password.
+
+**4. Run the installer, on the console:**
+
+```sh
+ssh ark@192.168.1.42
 cd /roms/pocket-clawd
 ./install/install.sh
 ```
@@ -76,15 +93,17 @@ cd /roms/pocket-clawd
 It adds **Pocket Clawd** to the console's main menu with its own artwork, and restarts the menu.
 Safe to run twice. `install/uninstall.sh` puts everything back exactly as it was.
 
-**3. Start it on your computer.**
+**5. Start it on your computer, and leave it running.**
 
 * **Windows** — double-click `pc\Start Pocket Clawd.cmd`. Nothing to install.
 * **Mac or Linux** — `python pc/clawd_pusher.py`
 
 The console announces itself on the network, so there's usually no address to type. Within a few
-seconds the bars fill in.
+seconds the bars fill in. Close that window and the console stops getting updates — it'll show
+`(STALE!)` and then Clawd falls asleep.
 
-Stuck? [docs/INSTALL.md](docs/INSTALL.md) covers the awkward cases.
+Stuck at any step? [docs/INSTALL.md](docs/INSTALL.md) goes through it slowly, including what to do
+when something doesn't appear.
 
 ### If your WiFi won't work, or there's no computer around
 
@@ -117,9 +136,13 @@ Two words get animated whenever he says them:
 Everything worth changing is a plain file you can edit on the card:
 
 * **`quips.txt`** — everything Clawd says, one line each. This is the whole feature; write your own.
-* **`anthem.wav`** — what L2 plays. Drop in any audio file named `anthem.*` and it takes over. The
-  one included is a chiptune generated from arithmetic by `tools/bake_chiptune.py`, so it's
-  original and free to pass on.
+* **`anthem.wav`** — what L2 plays. Drop in any audio file named `anthem.*` (mp3, ogg, wav…) and
+  it takes over. The one included is an original chiptune generated from arithmetic by
+  `tools/bake_chiptune.py`, so it's free to pass on.
+
+  If you want the one I actually use: **[Claude's Plan by Jeff Guo](https://www.youtube.com/watch?v=9kT0oLBPiOw)**.
+  It isn't in this repo because it's his, not mine — grab your own copy and save it as
+  `anthem.mp3` in the app folder.
 * **`config.json`** — thresholds, button codes, how it gets its data. Every setting is optional.
 
 `python tools/sim.py` renders any state to a picture without a console attached —
