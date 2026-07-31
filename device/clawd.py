@@ -567,8 +567,11 @@ class Screen:
         self.fb.write(data)
 
 
-def draw_title(scr, anim_elapsed):
-    """Header: rainbow wave for ~3s (startup + every 5 min), then calm glow."""
+def draw_title(scr, anim_elapsed, style=0):
+    """Header: ~3s of animation (startup + periodic), then calm glow.
+
+    style 0 is the rainbow wave; style 1 shimmers like a nether portal --
+    two interfering waves of purple instead of a bounce."""
     title = "CLAUDE USAGE"
     x0 = (W - scr.text_w(title, 4)) // 2
     if anim_elapsed is None or anim_elapsed > 3.0:
@@ -578,9 +581,17 @@ def draw_title(scr, anim_elapsed):
     cx = x0
     for i, ch in enumerate(title):
         ph = anim_elapsed * 5 - i * 0.45
-        yoff = int(math.sin(ph) * 9 * damp) if ph > 0 else 0
-        r, g, b = colorsys.hsv_to_rgb(
-            (anim_elapsed * 0.45 + i * 0.055) % 1.0, 0.75, 1.0)
+        if style == 1:
+            yoff = int(math.sin(ph * 1.4) * 3 * damp) if ph > 0 else 0
+            swirl = math.sin(anim_elapsed * 6.0 + i * 1.7) \
+                * math.sin(anim_elapsed * 2.3 - i * 0.6)
+            hue = (0.76 + 0.05 * math.sin(anim_elapsed * 3.0 + i * 0.9)) % 1.0
+            r, g, b = colorsys.hsv_to_rgb(
+                hue, 0.85, 0.45 + 0.55 * (swirl * 0.5 + 0.5))
+        else:
+            yoff = int(math.sin(ph) * 9 * damp) if ph > 0 else 0
+            r, g, b = colorsys.hsv_to_rgb(
+                (anim_elapsed * 0.45 + i * 0.055) % 1.0, 0.75, 1.0)
         col = tuple(int(c * 255 * damp + a * (1 - damp))
                     for c, a in zip((r, g, b), ACCENT))
         for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
@@ -990,7 +1001,7 @@ INJECTED = []
 # this, because it has no SELECT or START.
 EXIT_HINT = "SELECT+START = EXIT"
 
-VISITOR_GAP = (14.0, 26.0)      # seconds between visitors
+VISITOR_GAP = (540.0, 660.0)    # seconds between visitors -- about one each 10 min
 _visitor_bag = []
 
 
@@ -1918,8 +1929,12 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
     trend_i = 2
     trend_n = trend_steps[trend_i]
     stick = [None]  # latest raw left-stick X value
-    title_anim_start = time.time()
-    next_title_anim = title_anim_start + 300
+    run_t0 = time.time()
+    title_anim_start = run_t0
+    # every 3 minutes while the widget is fresh, easing off to every 10
+    # once it has been up half an hour
+    next_title_anim = title_anim_start + 180
+    title_style = 0
     sim_left = int(os.environ.get("CLAWD_SIM_FRAMES", "80")) if SIM else -1
     # 0 means run until something stops us -- what a live viewer wants. Decided
     # once, before the loop: deriving it from the counter each pass makes the
@@ -1964,9 +1979,10 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
         scr.clear(BG)
         if t > next_title_anim:
             title_anim_start = t
-            next_title_anim = t + 300
+            next_title_anim = t + (600 if t - run_t0 > 1800 else 180)
+            title_style = random.randint(0, 1)
         el = t - title_anim_start
-        draw_title(scr, el if el < 3.0 else None)
+        draw_title(scr, el if el < 3.0 else None, title_style)
         scr.text(W - 48 - scr.text_w("00:00", 2), 8, time.strftime("%H:%M"), CHIP_FG, 2)
         chip(scr, 48, 8, "LINK/" + link)
         scr.rect(48, 62, W - 96, 2, (60, 40, 34))
@@ -2046,7 +2062,8 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
         clawd.draw(scr, mood)
 
         # a pet drifting through, so the whole roster gets seen and not just
-        # whichever poses your live sessions happen to map to
+        # whichever poses your live sessions happen to map to. Kept scarce --
+        # a constant parade through the tank is clutter
         if visitor[0] is None:
             if t > next_visitor[0]:
                 name = next_visitor_name()
