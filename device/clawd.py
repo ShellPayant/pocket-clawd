@@ -973,6 +973,65 @@ def clawd_bounds(sc):
     return float(lo), float(hi)
 
 
+VISITOR_GAP = (14.0, 26.0)      # seconds between visitors
+_visitor_bag = []
+
+
+def next_visitor_name():
+    """Deal pets without replacement, so the whole roster gets seen rather
+    than the same three showing up all evening."""
+    global _visitor_bag
+    if not _visitor_bag:
+        _visitor_bag = [n for n in PETS if PETS.get(n)]
+        random.shuffle(_visitor_bag)
+    return _visitor_bag.pop() if _visitor_bag else None
+
+
+class Visitor:
+    """A pet drifting through the tank, captioned with its name.
+
+    Most of the bundled pets are tied to a state you hope never happens -- the
+    401 one wants your credentials to have expired -- so without this you would
+    never meet them. Sessions still own the sea floor; visitors use the open
+    water above it and are gone in a few seconds.
+
+    Movement is a whole pixel per frame. This panel has one page of video
+    memory and no vsync, so anything moving horizontally by fractions tears."""
+
+    def __init__(self, name, y):
+        self.name = name
+        self.y = y
+        self.phase = random.uniform(0, 6.28)
+        # blit() clips to the screen, not to the panel, so a visitor half in
+        # the tank would spill over the frame and into the trend chart next
+        # door. Keep it entirely inside the water and let it appear from
+        # behind the seaweed at the edges instead.
+        frames = PETS.get(name) or []
+        pw = frames[0][0] if frames else 40
+        self.half = pw // 2 + 2
+        self.x = float(AQ_IN_X0 + self.half)
+        self.end = float(AQ_IN_X1 - self.half)
+
+    def update(self):
+        self.x += 1.0
+        return self.x <= self.end
+
+    def draw(self, scr):
+        frames = PETS.get(self.name)
+        if not frames:
+            return
+        t = time.time()
+        pet = frames[int(t * 8 + self.phase) % len(frames)]
+        pw, _ph, _runs = pet
+        yy = int(self.y + math.sin(t * 1.5 + self.phase) * 2)
+        x = int(self.x)
+        label = self.name.upper().replace("-", " ")[:11]
+        lw = scr.text_w(label, 1)
+        lx = min(max(x - lw // 2, AQ_IN_X0 + 2), AQ_IN_X1 - lw - 2)
+        scr.text(lx, yy - 9, label, (150, 214, 244), 1)
+        scr.blit(x - pw // 2, yy, pet)
+
+
 def parse_sessions(d):
     """[(name, terminal_count, busy)] from the payload.
 
@@ -1805,6 +1864,9 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
     title_anim_start = time.time()
     next_title_anim = title_anim_start + 300
     sim_left = int(os.environ.get("CLAWD_SIM_FRAMES", "80")) if SIM else -1
+    visitor = [None]
+    # the first one turns up quickly, so a fresh launch shows what this is
+    next_visitor = [time.time() + 5.0]
     sim_action = os.environ.get("CLAWD_SIM_ACTION") if SIM else None
     # fire it a quarter of the way in, so there's a before and an after
     sim_action_at = int(sim_left * 0.75) if sim_left > 0 else -1
@@ -1921,6 +1983,19 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
                 last_input = t        # a real push counts as interaction
         clawd.update(clawd_lo, clawd_hi, t - last_input)
         clawd.draw(scr, mood)
+
+        # a pet drifting through, so the whole roster gets seen and not just
+        # whichever poses your live sessions happen to map to
+        if visitor[0] is None:
+            if t > next_visitor[0]:
+                name = next_visitor_name()
+                if name:
+                    visitor[0] = Visitor(name, AQ_Y + 22)
+                next_visitor[0] = t + random.uniform(*VISITOR_GAP)
+        elif not visitor[0].update():
+            visitor[0] = None
+        if visitor[0] is not None:
+            visitor[0].draw(scr)
 
         # The friends go in FRONT of Clawd. He is big and lives in the middle,
         # so drawing him last hid whichever session happened to be behind him --
