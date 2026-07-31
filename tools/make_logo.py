@@ -111,6 +111,63 @@ SHELL = (222, 176, 190)
 CLEAR_FROM = 0.55
 
 
+def load_pet(name, frame=0):
+    """One baked sprite as a PIL image. Read straight from the .raw the console
+    uses, so what's in the art is exactly what's on the device."""
+    import struct
+    from PIL import Image
+
+    path = os.path.join(ROOT, "device", "pets", "%s_f%d.raw" % (name, frame))
+    with open(path, "rb") as f:
+        data = f.read()
+    pw, ph = struct.unpack("<HH", data[:4])
+    return Image.frombytes("RGBA", (pw, ph), data[4:4 + pw * ph * 4], "raw", "BGRA")
+
+
+def pet_names():
+    import glob
+    names = set()
+    for p in glob.glob(os.path.join(ROOT, "device", "pets", "*_f0.raw")):
+        names.add(os.path.basename(p)[:-len("_f0.raw")])
+    return sorted(names)
+
+
+def add_cast(img, sand_y):
+    """Line every bundled pet up along the sea floor.
+
+    Most of them only ever appear for a specific state -- the 401 one wants
+    your credentials to have expired -- so without this the artwork nobody
+    normally sees never gets seen. The bottom of the screen is used because the
+    carousel's logo stack is centred vertically and doesn't reach down here.
+    """
+    from PIL import Image
+
+    names = pet_names()
+    if not names:
+        return img
+    rows = [names[:(len(names) + 1) // 2], names[(len(names) + 1) // 2:]]
+    # kept above y=0.94: the theme draws its button-help bar at 0.948
+    baselines = [int(img.height * 0.862), int(img.height * 0.935)]
+    heights = [40, 46]              # the front row slightly larger
+
+    for row, base_y, target_h in zip(rows, baselines, heights):
+        if not row:
+            continue
+        pitch = (img.width - 40) / float(len(row))
+        for i, name in enumerate(row):
+            try:
+                sprite = load_pet(name)
+            except (OSError, ValueError):
+                continue
+            scale = min(target_h / float(sprite.height), 70.0 / sprite.width)
+            size = (max(1, int(sprite.width * scale)),
+                    max(1, int(sprite.height * scale)))
+            sprite = sprite.resize(size, Image.NEAREST)
+            cx = int(20 + pitch * (i + 0.5))
+            img.paste(sprite, (cx - size[0] // 2, base_y - size[1]), sprite)
+    return img
+
+
 def scene(w=960, h=720):
     """The full-bleed carousel background.
 
@@ -230,26 +287,51 @@ def scene(w=960, h=720):
     # sprite cells wide with both claws out, so derive the cell size from the
     # space available rather than picking one and clipping a claw off the edge.
     clear_x0, clear_x1 = int(w * CLEAR_FROM), w - 16
-    sc = max(6, min(13, (clear_x1 - clear_x0 - 20) // 36))
+    sc = max(6, min(12, (clear_x1 - clear_x0 - 20) // 36))
     centre = (clear_x0 + clear_x1) // 2
-    floor = sand_y + 36
+    floor = sand_y + 54
     pet = clawd.Clawd(0, floor, sc=sc)
     pet.x = float(centre - 10 * sc)              # he spans x-8*sc .. x+28*sc
     pet.blink_until = 0
     pet.next_blink = clawd.time.time() + 9999
-    pet.pcur = [0.0, 0.0]
-    pet.pupil = (0, 0)
-    pet.draw(scr, 0)
+    pet.pupil = (0, 1)
+    pet.pcur = [0.0, 1.0]                        # eyes down, on the screen
+    pet.draw(scr, 1)                             # mood 1: the focused mouth
+    laptop(scr, centre, floor, sc)
 
-    # a couple of friends in front, so it reads as the tank and not a mascot
-    if clawd.PETS:
-        for name, fx in (("waving", clear_x0 + 40), ("happy", clear_x1 - 40)):
-            if name in clawd.PETS:
-                fr = clawd.Friend(name, fx, floor + 8)
-                fr.next_hop = clawd.time.time() + 9999
-                fr.draw(scr)
+    img = Image.frombytes("RGBA", (w, h), bytes(scr.buf), "raw", "BGRA").convert("RGB")
+    return add_cast(img, sand_y)
 
-    return Image.frombytes("RGBA", (w, h), bytes(scr.buf), "raw", "BGRA").convert("RGB")
+
+def laptop(scr, cx, floor, sc):
+    """A little machine for him to work at. He is a Claude Code pet; he should
+    look like he's doing something."""
+    lw = int(sc * 7.0)
+    lh = int(sc * 4.2)
+    bx = cx - lw // 2
+    by = floor - lh - int(sc * 0.3)
+
+    body = (46, 52, 64)
+    edge = (96, 104, 122)
+    glow = (18, 32, 30)
+
+    # screen, with a lit panel and a couple of lines of "code"
+    scr.rect(bx, by, lw, lh, body)
+    scr.frame(bx, by, lw, lh, edge, 2)
+    scr.rect(bx + 4, by + 4, lw - 8, lh - 8, glow)
+    line_h = max(2, sc // 5)
+    ly = by + 8
+    for k, (frac, col) in enumerate(((0.55, clawd.GOOD), (0.75, (120, 200, 240)),
+                                     (0.40, clawd.ACCENT), (0.62, (150, 160, 190)))):
+        if ly + line_h > by + lh - 8:
+            break
+        scr.rect(bx + 8, ly, int((lw - 18) * frac), line_h, col)
+        ly += line_h + max(2, sc // 6)
+
+    # the base, a touch wider than the lid, and a hinge line
+    kb_h = max(3, sc // 2)
+    scr.rect(bx - 3, floor - kb_h, lw + 6, kb_h, edge)
+    scr.rect(bx - 3, floor - kb_h, lw + 6, 2, (150, 158, 178))
 
 
 def background(scale=13):

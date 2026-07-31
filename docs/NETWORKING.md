@@ -161,10 +161,23 @@ One flat JSON object, about 300 bytes:
   "epoch": 1785451207,
   "note": "LAST PROJECT: SIDEQUEST",
   "sessions": "SIDEQUEST,PORTFOLIO",
+  "session_info": [
+    {"n": "SIDEQUEST", "c": 3, "b": 1},
+    {"n": "PORTFOLIO", "c": 1, "b": 0}
+  ],
   "rl": 0,
   "link": "push"
 }
 ```
+
+`session_info` is one entry per project you have Claude Code open in: `n` the
+project name, `c` how many terminals are in it, `b` whether any of them is
+working right now. It comes from Claude Code's own live session list
+(`~/.claude/sessions/`); if that isn't present the pusher falls back to looking
+at which transcripts were written to recently, and sends counts of 1. Only the
+last part of each path is ever sent -- your home directory stays on your
+machine. `sessions` is the same names as a plain string, kept so an older
+console still works.
 
 Percentages, reset times, and the names of the projects you have open — those
 last two are what the aquarium friends and their signs are made of. No prompts,

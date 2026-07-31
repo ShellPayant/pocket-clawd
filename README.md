@@ -7,8 +7,10 @@ A Claude usage meter that lives on a cheap retro handheld, with a crab in it.
 Your 5-hour window, your weekly limits and a trend chart, drawn straight to the
 console's framebuffer at 640x480. Down in the corner there's a fish tank: Clawd
 the crab lives there and gets progressively more worried as your usage climbs,
-and every Claude Code session you have open right now shows up as a little
-friend with a name sign. When Anthropic rate-limits you, the 429 pet swims in
+and every Claude Code project you have open right now shows up as a little
+friend with a name sign -- `SIDEQUEST X3` if you've got three terminals in it,
+and a busy pose if it's actually working right now. Clawd shuffles over to make
+room as the tank fills up. When Anthropic rate-limits you, the 429 pet swims in
 to apologise.
 
 It runs as its own entry on the console's main menu, next to the consoles.
