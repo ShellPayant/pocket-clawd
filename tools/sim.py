@@ -26,16 +26,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEVICE = os.path.join(ROOT, "device")
 SIMDIR = os.path.join(ROOT, "sim")
 
+# Sessions are (name, terminal count, busy). Names are deliberately generic:
+# they show up on screen and these images end up in a public README.
+S1 = [("SIDEQUEST", 1, 1)]
+S2 = [("SIDEQUEST", 3, 1), ("PORTFOLIO", 1, 0)]
+S3 = [("SIDEQUEST", 3, 1), ("PORTFOLIO", 1, 0), ("DOTFILES", 2, 0)]
+S4 = S3 + [("SCRAPER", 1, 1)]
+S5 = S4 + [("BLOG", 1, 0)]
+
 # five_hour, seven_day, scoped, rate-limited, sessions, age of the data
 STATES = {
-    "normal":      (32, 41, 28, 0, ["SIDEQUEST"], 5),
-    "busy":        (68, 74, 61, 0, ["SIDEQUEST", "PORTFOLIO"], 5),
-    "critical":    (94, 88, 91, 0, ["SIDEQUEST", "PORTFOLIO", "DOTFILES"], 5),
-    "ratelimited": (88, 79, 84, 1, ["SIDEQUEST"], 5),
+    "normal":      (32, 41, 28, 0, S1, 5),
+    "busy":        (68, 74, 61, 0, S2, 5),
+    "critical":    (94, 88, 91, 0, S3, 5),
+    "ratelimited": (88, 79, 84, 1, S1, 5),
     "idle":        (21, 37, 15, 0, [], 5),
-    "sleeping":    (44, 52, 30, 0, ["SIDEQUEST"], 900),
-    "stale":       (44, 52, 30, 0, ["SIDEQUEST"], 200),
+    "sleeping":    (44, 52, 30, 0, S1, 900),
+    "stale":       (44, 52, 30, 0, S1, 200),
     "nodata":      None,
+    "tank1":       (40, 40, 40, 0, S1, 5),
+    "tank2":       (40, 40, 40, 0, S2, 5),
+    "tank3":       (40, 40, 40, 0, S3, 5),
+    "tank4":       (40, 40, 40, 0, S4, 5),
+    "tank5":       (40, 40, 40, 0, S5, 5),
 }
 
 
@@ -58,7 +71,8 @@ def write_fixtures(state, simdir):
         "updated": time.strftime("%H:%M", time.localtime(now - age)),
         "epoch": int(now - age),
         "note": "LAST PROJECT: SIDEQUEST",
-        "sessions": ",".join(sessions),
+        "sessions": ",".join(n for n, _c, _b in sessions),
+        "session_info": [{"n": n, "c": c, "b": b} for n, c, b in sessions],
         "rl": rl,
         "link": "wifi",
     }

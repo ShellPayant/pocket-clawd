@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -46,6 +47,7 @@ LOCK_PORT = 8790      # a bound socket is a simpler mutex than a PID file
 CLAUDE_DIR = os.path.join(os.path.expanduser("~"), ".claude")
 CRED_FILE = os.path.join(CLAUDE_DIR, ".credentials.json")
 PROJECTS_DIR = os.path.join(CLAUDE_DIR, "projects")
+SESSIONS_DIR = os.path.join(CLAUDE_DIR, "sessions")
 
 
 def log(msg):
@@ -116,8 +118,105 @@ def project_name(dirname):
     return (parts[-1] if parts else dirname).upper()[:10]
 
 
-def active_sessions(within=300, limit=3):
-    """Projects touched in the last few minutes -- one aquarium friend each."""
+# Words that identify the tool rather than the project. Plenty of people keep
+# their work under a "Claude" folder, and labelling six different projects
+# CLAUDE helps nobody.
+GENERIC_PARTS = {"CLAUDE", "CODE", "DEV", "SRC", "PROJECTS", "REPOS", "WORK"}
+
+
+def project_label(cwd):
+    """A short, recognisable name for a working directory.
+
+    Only ever returns the last meaningful part of the path -- the full path is
+    never sent anywhere, since it contains the user's home directory."""
+    base = str(cwd).replace("\\", "/").rstrip("/").split("/")[-1]
+    # split on " - ", whitespace and underscores, but keep hyphenated-words whole
+    parts = [p for p in re.split(r"\s*-\s+|\s+|_", base) if p]
+    if not parts:
+        return "PROJECT"
+    label = parts[-1]
+    if label.upper() in GENERIC_PARTS and len(parts) > 1:
+        label = parts[-2]
+    return label.upper()[:10]
+
+
+def _alive_pids(pids):
+    """Which of these process IDs are actually still running.
+
+    A crashed CLI leaves its registry file behind, and the file's timestamp
+    isn't a reliable liveness signal either -- an idle session can sit for an
+    hour without touching it. So ask the OS.
+
+    Note os.kill(pid, 0) is NOT safe on Windows: CPython maps it to
+    TerminateProcess, which would kill the very sessions we're counting."""
+    live = set()
+    if os.name == "nt":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        for pid in pids:
+            handle = kernel32.OpenProcess(QUERY_LIMITED_INFORMATION, False, int(pid))
+            if not handle:
+                continue
+            code = ctypes.c_ulong()
+            ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+            kernel32.CloseHandle(handle)
+            if ok and code.value == STILL_ACTIVE:
+                live.add(int(pid))
+    else:
+        for pid in pids:
+            try:
+                os.kill(int(pid), 0)
+                live.add(int(pid))
+            except (OSError, ValueError):
+                pass
+    return live
+
+
+def live_sessions(limit=5):
+    """[(label, terminal_count, busy)] from Claude Code's live session registry.
+
+    ~/.claude/sessions/<pid>.json is one file per running CLI, with the real
+    working directory and a busy/idle status. Returns None if that isn't there,
+    so the caller can fall back -- it's an internal file and may change."""
+    try:
+        files = [f for f in os.listdir(SESSIONS_DIR) if f.endswith(".json")]
+    except OSError:
+        return None
+    entries = []
+    for name in files:
+        try:
+            with open(os.path.join(SESSIONS_DIR, name)) as f:
+                d = json.load(f)
+        except (OSError, ValueError):
+            continue
+        pid, cwd = d.get("pid"), d.get("cwd")
+        if pid and cwd and d.get("kind", "interactive") == "interactive":
+            entries.append((int(pid), cwd, str(d.get("status") or "").lower()))
+    if not entries:
+        return None
+    alive = _alive_pids([p for p, _c, _s in entries])
+    groups, order = {}, []
+    for pid, cwd, status in entries:
+        if pid not in alive:
+            continue
+        label = project_label(cwd)
+        if label not in groups:
+            groups[label] = [0, 0]
+            order.append(label)
+        groups[label][0] += 1
+        if status == "busy":
+            groups[label][1] = 1
+    if not groups:
+        return None
+    return [(n, groups[n][0], groups[n][1]) for n in order][:limit]
+
+
+def scanned_sessions(within=300, limit=5):
+    """Fallback: projects whose transcript was written to recently. Coarser --
+    it can't tell two terminals in one project apart, and an idle one drops off
+    once it stops writing."""
     names, newest, newest_at = [], None, 0
     try:
         entries = os.listdir(PROJECTS_DIR)
@@ -147,6 +246,17 @@ def active_sessions(within=300, limit=3):
     return names[:limit], (project_name(newest) if newest else None)
 
 
+def active_sessions(limit=5):
+    """([(label, count, busy)], note_name) -- the registry when available."""
+    info = live_sessions(limit)
+    scanned, newest = scanned_sessions(limit=limit)
+    if info is None:
+        info = [(n, 1, 0) for n in scanned]
+    if not newest and info:
+        newest = info[0][0]
+    return info, newest
+
+
 def fetch_usage(token):
     req = urllib.request.Request(USAGE_URL, headers={
         "Authorization": "Bearer %s" % token,
@@ -170,7 +280,7 @@ def build_payload(usage):
             if name:
                 scoped_label = str(name).split("-")[0].upper()[:9]
             break
-    sessions, newest = active_sessions()
+    info, newest = active_sessions()
     return {
         "five_hour_pct": int(five.get("utilization") or 0),
         "five_hour_reset": fmt_reset(five.get("resets_at")),
@@ -181,7 +291,10 @@ def build_payload(usage):
         "updated": time.strftime("%H:%M"),
         "epoch": int(time.time()),
         "note": ("LAST PROJECT: %s" % newest) if newest else None,
-        "sessions": ",".join(sessions),
+        # legacy: names only, kept so an older console still works
+        "sessions": ",".join(n for n, _c, _b in info),
+        # n=name, c=how many terminals in it, b=any of them busy right now
+        "session_info": [{"n": n, "c": c, "b": b} for n, c, b in info],
         "rl": 0,
     }
 
@@ -402,7 +515,9 @@ def main():
             payload["rl"] = rate_limited
             payload["updated"] = time.strftime("%H:%M")
             payload["epoch"] = int(time.time())
-            payload["sessions"] = ",".join(active_sessions()[0])
+            fresh = active_sessions()[0]
+            payload["sessions"] = ",".join(n for n, _c, _b in fresh)
+            payload["session_info"] = [{"n": n, "c": c, "b": b} for n, c, b in fresh]
             ServeHandler.payload = payload
             sent = 0
             for url in urls:

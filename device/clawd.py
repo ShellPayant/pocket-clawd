@@ -687,6 +687,8 @@ class Clawd:
         self.forced_mood = None  # (mood, until) via d-pad showcase
         self.force_sleep_until = 0
         self.throw_until = 0     # claws up, launching the tank friends
+        self._bag = []           # quips dealt without replacement
+        self._bag_of = 0
 
     def poke(self):  # fresh data arrived
         self.jump_until = time.time() + 0.6
@@ -706,6 +708,12 @@ class Clawd:
         self.bubble = (lines[:3], time.time() + 4.5)
 
     def pick_quip(self):
+        """Deal from a shuffled bag rather than picking at random.
+
+        Uniform random meant the three rainbow ULTRATHINK/ULTRACODE lines were
+        a 1-in-11 shot each time, so it was entirely possible to watch for ten
+        minutes and never see one. Dealing without replacement guarantees every
+        line shows up once per cycle."""
         pool = list(QUIPS)
         d = self.ctx
         if d:
@@ -723,7 +731,13 @@ class Clawd:
             note = d.get("note")
             if note:
                 pool += [note, note]
-        return random.choice(pool)
+        # Refill when empty, or when the pool itself changed (new data brings
+        # new context lines in and drops stale ones).
+        if not self._bag or self._bag_of != len(pool):
+            self._bag = list(pool)
+            self._bag_of = len(pool)
+            random.shuffle(self._bag)
+        return self._bag.pop()
 
     def on_action(self, action):
         t = time.time()
@@ -919,17 +933,97 @@ WEED = (52, 168, 96)
 WEED_D = (36, 118, 68)
 STARFISH = (255, 140, 80)
 FRIEND_POSES = ["sleeping", "waving", "mindblown", "celebrating", "happy"]
+# A session that is actually working right now looks like it. The pusher
+# reports this per project, so the tank tells you what's running at a glance.
+BUSY_POSES = ["working-thinking", "coding", "celebrating"]
+IDLE_POSES = ["sleeping", "happy", "waving", "mindblown"]
 PET_YOFF = {"sleeping": 8}  # lying poses sit down into the sand
+
+# The aquarium panel, and the water inside it. draw_aquarium() insets by 4.
+AQ_X, AQ_Y, AQ_W, AQ_H = 316, 352, 284, 108
+AQ_IN_X0, AQ_IN_X1 = AQ_X + 4, AQ_X + AQ_W - 4      # 320 .. 596
+FRIEND_FLOOR = 442
+MAX_FRIENDS = 5
+
+# Clawd gets out of the way as the tank fills: five friends plus a full-size
+# crab do not fit in 276 pixels. Sprite cell size by friend count.
+CLAWD_SCALE = {0: 5, 1: 4, 2: 4, 3: 3, 4: 3, 5: 3}
+
+
+def friend_layout(n):
+    """Evenly spaced centres across the water, plus the character budget for
+    each sign so they don't collide at the tighter spacings."""
+    if n <= 0:
+        return [], 10
+    x0, x1 = AQ_IN_X0 + 6, AQ_IN_X1 - 6
+    pitch = (x1 - x0) / float(n)
+    centres = [int(x0 + pitch * (i + 0.5)) for i in range(n)]
+    # a sign is len(label) * 6 + 8 pixels wide, and must fit inside the pitch
+    maxlen = max(3, min(12, int((pitch - 10) // 6)))
+    return centres, maxlen
+
+
+def clawd_bounds(sc):
+    """How far Clawd can roam without pushing his claws through the glass.
+    He is drawn from x - 8*sc to x + 28*sc."""
+    lo = AQ_IN_X0 + 8 * sc + 2
+    hi = AQ_IN_X1 - 28 * sc - 2
+    if hi < lo:                       # absurdly large sprite; centre him
+        lo = hi = (AQ_IN_X0 + AQ_IN_X1) // 2 - 10 * sc
+    return float(lo), float(hi)
+
+
+def parse_sessions(d):
+    """[(name, terminal_count, busy)] from the payload.
+
+    Prefers `session_info`, which carries per-project terminal counts and
+    busy state. Falls back to the plain comma-separated `sessions` string so
+    an older pusher still populates the tank."""
+    if not d:
+        return []
+    info = d.get("session_info")
+    out = []
+    if isinstance(info, list):
+        for item in info:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("n") or "").upper()[:10]
+            if not name:
+                continue
+            try:
+                count = max(1, int(item.get("c") or 1))
+            except (TypeError, ValueError):
+                count = 1
+            out.append((name, count, 1 if item.get("b") else 0))
+    if not out:
+        sess = d.get("sessions") or ""
+        if isinstance(sess, str):
+            sess = [s for s in sess.split(",") if s]
+        for s in sess:
+            out.append((str(s).upper()[:10], 1, 0))
+    return out[:MAX_FRIENDS]
 TOSS_TIME = 0.85            # seconds a friend spends in the air
 TOSS_HEIGHT = 54            # pixels at the top of the arc
 TOSS_STAGGER = 0.22         # gap between one friend's launch and the next
 
 
 class Friend:
-    def __init__(self, name, x, floor, session=""):
+    def __init__(self, name, x, floor, session="", count=1, busy=0, maxlen=8):
         self.session = session
-        if name is None:  # stable pose per session name
-            pool = [p for p in FRIEND_POSES if p in PETS] or list(PETS)
+        self.count = max(1, int(count))
+        self.busy = 1 if busy else 0
+        # "R36S X3" -- budget the suffix first, so the count is never the thing
+        # that gets cut off, and the whole sign still fits its slot
+        suffix = (" X%d" % self.count) if self.count > 1 else ""
+        room = max(3, maxlen - len(suffix))
+        self.label = session[:room] + suffix
+        if name is None:
+            # stable pose per session name, but drawn from the pool that
+            # matches what the session is doing right now
+            poses = BUSY_POSES if self.busy else IDLE_POSES
+            pool = [p for p in poses if p in PETS]
+            if not pool:
+                pool = [p for p in FRIEND_POSES if p in PETS] or list(PETS)
             name = pool[sum(ord(c) for c in session) % len(pool)] if pool else ""
         self.name = name
         self.x = float(x)
@@ -945,7 +1039,7 @@ class Friend:
     def draw_sign(self, scr, lower=0):
         if not self.session:
             return
-        label = self.session[:8]
+        label = self.label or self.session[:8]
         w = len(label) * 6 + 8
         sx = int(self.x) - w // 2
         sy = self.floor + 1 + lower
@@ -961,18 +1055,24 @@ class Friend:
         if t > self.next_act:
             self.next_act = t + random.uniform(35, 70)
             if random.random() < 0.35:
-                poses = [p for p in FRIEND_POSES if p in PETS and p != self.name]
-                if poses:
-                    self.name = random.choice(poses)
+                self.reroll()
         if t > self.next_hop:
             self.hop_until = t + 0.45
             self.next_hop = t + random.uniform(6, 16)
         # friends stay put: bob + hop only (sideways creep read as jitter)
 
+    def pose_pool(self):
+        poses = BUSY_POSES if self.busy else IDLE_POSES
+        pool = [p for p in poses if p in PETS and p != self.name]
+        return pool or [p for p in FRIEND_POSES if p in PETS and p != self.name]
+
+    def reroll(self):
+        pool = self.pose_pool()
+        if pool:
+            self.name = random.choice(pool)
+
     def shuffle(self):
-        poses = [p for p in FRIEND_POSES if p in PETS and p != self.name]
-        if poses:
-            self.name = random.choice(poses)
+        self.reroll()
         self.hop_until = time.time() + 0.45
 
     def toss(self, delay=0.0):
@@ -1006,9 +1106,9 @@ class Friend:
             if not self.tossed and k > 0.45:
                 # swap the pose at the apex: that's the showing-off part
                 self.tossed = True
-                poses = [p for p in FRIEND_POSES if p in PETS and p != self.name]
-                if poses:
-                    self.name = random.choice(poses)
+                pool = self.pose_pool()
+                if pool:
+                    self.name = random.choice(pool)
                     frames = PETS.get(self.name) or frames
         rate = 8 + spin
         pet = frames[int(t * rate + self.phase * 2) % len(frames)]
@@ -1672,7 +1772,7 @@ def main(argv=None):
 
     held = set()
     last_input = time.time()
-    clawd = Clawd(430, 448)
+    clawd = Clawd(430, FRIEND_FLOOR + 6)
     if SIM and os.environ.get("CLAWD_SIM_SAY"):
         clawd.say(os.environ["CLAWD_SIM_SAY"])
         clawd.bubble = (clawd.bubble[0], time.time() + 999)
@@ -1765,26 +1865,26 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
         ztxt = "%dMIN" % (trend_n * 2)
         scr.text(296 - scr.text_w(ztxt, 1) - 6, 358, ztxt, CHIP_FG, 1)
         draw_aquarium(scr, 316, 352, 284, 108, t)
-        # one friend per active Claude Code session, each with a fixed slot
-        sess = (d.get("sessions") or "") if d else ""
-        if isinstance(sess, str):
-            sess = [s for s in sess.split(",") if s]
-        sess = [str(s).upper()[:10] for s in sess][:3]
-        if PETS and sess != [f.session for f in friends]:
-            slots = {1: (556,), 2: (362, 556), 3: (352, 462, 568)}.get(
-                len(sess), (352, 462, 568))
-            friends[:] = [Friend(None, slots[i], 442, s)
-                          for i, s in enumerate(sess)]
+        # one friend per active Claude Code project, sized and spaced to fit
+        info = parse_sessions(d)
+        if PETS and info != [(f.session, f.count, f.busy) for f in friends]:
+            centres, maxlen = friend_layout(len(info))
+            friends[:] = [
+                Friend(None, centres[i], FRIEND_FLOOR, name, count, busy, maxlen)
+                for i, (name, count, busy) in enumerate(info)]
+            # Clawd steps back as the tank fills, and his roaming range with him
+            clawd.sc = CLAWD_SCALE.get(len(info), 3)
+            lo, hi = clawd_bounds(clawd.sc)
+            clawd.x = min(max(clawd.x, lo), hi)
+            clawd.tx = clawd.x
+        clawd_lo, clawd_hi = clawd_bounds(clawd.sc)
         for fr in friends:
             fr.update(345, 575)
-            if fr.name == "sleeping":
-                fr.draw(scr)        # lying pose: sign in front, a bit lower
-                fr.draw_sign(scr, 4)
-            else:
-                fr.draw_sign(scr)
-                fr.draw(scr)
+        # Tucked into the top-left of the water: with no friends Clawd is at
+        # full size and owns the middle, so anything centred here sits behind
+        # his shell.
         if not friends:
-            scr.text(332, 446, "NO ACTIVE SESSIONS", (70, 110, 140), 1)
+            scr.text(AQ_IN_X0 + 5, AQ_Y + 9, "NO SESSIONS", (70, 110, 140), 1)
         # anthropic rate-limited us: the 429 pet floats in to apologize
         if d and d.get("rl") and "429" in PETS:
             fr4 = PETS["429"]
@@ -1813,12 +1913,23 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
             else:
                 norm = (v - 128) / 128.0
             if abs(norm) > dead:
-                clawd.x = max(336.0, min(516.0, clawd.x + norm * 3.4))
+                clawd.x = max(clawd_lo, min(clawd_hi, clawd.x + norm * 3.4))
                 clawd.tx = clawd.x
                 clawd.stick_until = t + 0.25
                 last_input = t        # a real push counts as interaction
-        clawd.update(355, 475, t - last_input)
+        clawd.update(clawd_lo, clawd_hi, t - last_input)
         clawd.draw(scr, mood)
+
+        # The friends go in FRONT of Clawd. He is big and lives in the middle,
+        # so drawing him last hid whichever session happened to be behind him --
+        # and being able to see every session is the entire point of the tank.
+        for fr in friends:
+            if fr.name == "sleeping":
+                fr.draw(scr)        # lying pose: sign in front, a bit lower
+                fr.draw_sign(scr, 4)
+            else:
+                fr.draw_sign(scr)
+                fr.draw(scr)
 
         status = "UPDATED " + str(d.get("updated", "?")) if d else "NO DATA"
         stale = d and d["_age"] > 150

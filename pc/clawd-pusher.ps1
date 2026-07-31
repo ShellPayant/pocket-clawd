@@ -29,6 +29,7 @@ $RateBackoff = 300
 $DiscoveryPort = 8787
 $CredFile = "$env:USERPROFILE\.claude\.credentials.json"
 $ProjectsDir = "$env:USERPROFILE\.claude\projects"
+$SessionsDir = "$env:USERPROFILE\.claude\sessions"
 
 function Say([string]$m) { Write-Host "$(Get-Date -Format HH:mm:ss)  $m" }
 
@@ -128,7 +129,60 @@ function Get-ProjectName([string]$dir) {
     return $n
 }
 
-function Get-ActiveSessions {
+# Words that name the tool rather than the project. Lots of people keep their
+# work under a "Claude" folder, and labelling six projects CLAUDE helps nobody.
+$GenericParts = @('CLAUDE', 'CODE', 'DEV', 'SRC', 'PROJECTS', 'REPOS', 'WORK')
+
+function Get-ProjectLabel([string]$cwd) {
+    # Only ever the last meaningful part of the path -- the full path contains
+    # the user's home directory and is never sent anywhere.
+    $base = ($cwd -replace '\\', '/').TrimEnd('/') -split '/' | Select-Object -Last 1
+    $parts = $base -split '\s*-\s+|\s+|_' | Where-Object { $_ }
+    if ($parts.Count -eq 0) { return "PROJECT" }
+    $label = $parts[-1]
+    if (($GenericParts -contains $label.ToUpper()) -and $parts.Count -gt 1) {
+        $label = $parts[-2]
+    }
+    $label = $label.ToUpper()
+    if ($label.Length -gt 10) { $label = $label.Substring(0, 10) }
+    return $label
+}
+
+function Get-LiveSessions {
+    # ~/.claude/sessions/<pid>.json is one file per running CLI, with the real
+    # working directory and a busy/idle status. Returns $null when it isn't
+    # there so the caller can fall back -- it is an internal file and may change.
+    if (-not (Test-Path $SessionsDir)) { return $null }
+    try {
+        $files = Get-ChildItem $SessionsDir -Filter *.json -ErrorAction Stop
+    } catch { return $null }
+    if (-not $files) { return $null }
+    # one process list, rather than probing each pid separately
+    $running = @{}
+    Get-Process -ErrorAction SilentlyContinue | ForEach-Object { $running[$_.Id] = $true }
+
+    $order = @()
+    $groups = @{}
+    foreach ($f in $files) {
+        try { $d = Get-Content $f.FullName -Raw | ConvertFrom-Json } catch { continue }
+        if (-not $d.pid -or -not $d.cwd) { continue }
+        if ($d.kind -and $d.kind -ne 'interactive') { continue }
+        if (-not $running.ContainsKey([int]$d.pid)) { continue }   # stale file
+        $label = Get-ProjectLabel $d.cwd
+        if (-not $groups.ContainsKey($label)) {
+            $groups[$label] = @{ n = $label; c = 0; b = 0 }
+            $order += $label
+        }
+        $groups[$label].c++
+        if ("$($d.status)".ToLower() -eq 'busy') { $groups[$label].b = 1 }
+    }
+    if ($order.Count -eq 0) { return $null }
+    return @($order | Select-Object -First 5 | ForEach-Object { $groups[$_] })
+}
+
+function Get-ScannedSessions {
+    # Fallback: projects whose transcript was written to recently. Coarser --
+    # it cannot tell two terminals in one project apart.
     try {
         $active = @()
         Get-ChildItem $ProjectsDir -Directory -ErrorAction Stop | ForEach-Object {
@@ -137,8 +191,15 @@ function Get-ActiveSessions {
                 Select-Object -First 1
             if ($recent) { $active += (Get-ProjectName $_.Name) }
         }
-        return (($active | Select-Object -Unique -First 3) -join ",")
-    } catch { return "" }
+        return @($active | Select-Object -Unique -First 5 |
+            ForEach-Object { @{ n = $_; c = 1; b = 0 } })
+    } catch { return @() }
+}
+
+function Get-SessionInfo {
+    $info = Get-LiveSessions
+    if ($null -eq $info) { $info = Get-ScannedSessions }
+    return @($info)
 }
 
 function Get-Payload {
@@ -164,6 +225,7 @@ function Get-Payload {
             }
         }
     }
+    $info = Get-SessionInfo
     $note = $null
     try {
         $proj = Get-ChildItem $ProjectsDir -Directory -ErrorAction Stop |
@@ -180,7 +242,10 @@ function Get-Payload {
         updated         = (Get-Date).ToString("HH:mm")
         epoch           = [DateTimeOffset]::Now.ToUnixTimeSeconds()
         note            = $note
-        sessions        = Get-ActiveSessions
+        # legacy: names only, so an older console still works
+        sessions        = (($info | ForEach-Object { $_.n }) -join ",")
+        # n=name, c=how many terminals in it, b=any of them busy right now
+        session_info    = $info
         rl              = 0
     }
 }
@@ -242,7 +307,9 @@ while ($true) {
         $send.rl = [int]$script:rl
         $send.updated = (Get-Date).ToString("HH:mm")
         $send.epoch = [DateTimeOffset]::Now.ToUnixTimeSeconds()
-        $send.sessions = Get-ActiveSessions
+        $fresh = Get-SessionInfo
+        $send.sessions = (($fresh | ForEach-Object { $_.n }) -join ",")
+        $send.session_info = $fresh
         $body = $send | ConvertTo-Json -Compress
         $headers = @{ 'Content-Type' = 'application/json' }
         if ($Secret) { $headers['X-Clawd-Secret'] = $Secret }
