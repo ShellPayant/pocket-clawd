@@ -114,6 +114,10 @@ when asked, and it writes the right numbers into `config.json`.
 |---|---|---|
 | ![](docs/screenshots/nodata.png) | ![](docs/screenshots/sleeping.png) | ![](docs/screenshots/letterboxed.png) |
 
+Two words get animated when Clawd says them:
+
+![ULTRATHINK in the speech bubble](docs/screenshots/ultrathink.png)
+
 ## Credits
 
 The little pets in the fish tank are **[clawd-pet](https://github.com/abderrahimghazali/clawd-pet)**
