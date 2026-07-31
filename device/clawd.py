@@ -745,11 +745,11 @@ class Clawd:
         # "shuffle" is handled in the main loop: it re-rolls the tank
 
     def auto_show(self):
-        # dance is button-only (Y) -- too energetic for ambient mode
+        # dance is button-only -- too energetic for ambient mode
         act = random.random()
-        if act < 0.6:
+        if act < 0.72:            # mostly talking: that's the character
             self.say(self.pick_quip())
-        elif act < 0.85:
+        elif act < 0.9:
             self.wave_until = time.time() + 2.2
         else:
             self.jump_until = time.time() + 0.6
@@ -765,9 +765,9 @@ class Clawd:
         if t > self.next_move and t > self.dance_until:
             self.tx = random.uniform(xmin, xmax)
             self.next_move = t + random.uniform(30, 55)
-        if idle_for > 12 and t > self.next_auto and not self.sleeping:
+        if idle_for > 8 and t > self.next_auto and not self.sleeping:
             self.auto_show()
-            self.next_auto = t + random.uniform(14, 26)
+            self.next_auto = t + random.uniform(10, 18)
         d = self.tx - self.x
         if abs(d) > 2 and t > self.dance_until:
             # constant whole-pixel speed: no fractional-step stutter
@@ -1803,8 +1803,11 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
                 center = (amin + amax) / 2.0
                 half = (amax - amin) / 2.0
                 norm = max(-1.0, min(1.0, (v - center) / half))
-                if flat and half:      # the driver's own deadzone, if it has one
-                    dead = max(0.12, min(0.5, flat / half))
+                # The driver's own `flat` is often far smaller than the real
+                # resting noise (32 out of 1800 on this one, against measured
+                # drift of ~170), so treat it as a lower bound, not the answer.
+                if flat and half:
+                    dead = max(0.25, min(0.5, flat / half))
             elif abs(v) > 512:
                 norm = max(-1.0, min(1.0, v / 32768.0))
             else:
@@ -1813,6 +1816,7 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
                 clawd.x = max(336.0, min(516.0, clawd.x + norm * 3.4))
                 clawd.tx = clawd.x
                 clawd.stick_until = t + 0.25
+                last_input = t        # a real push counts as interaction
         clawd.update(355, 475, t - last_input)
         clawd.draw(scr, mood)
 
@@ -1873,8 +1877,14 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
             for etype, code, value in read_events(f):
                 if etype == EV_ABS:
                     if code == ABS_X:
+                        # Deliberately NOT counted as user input here. These
+                        # sticks emit a steady stream of small values at rest
+                        # (measured: ~10 per second, drifting ~10% of range),
+                        # and treating that as interaction means the idle
+                        # timer never fires and Clawd never says anything on
+                        # his own. Input is registered below, only if the
+                        # stick actually moves past the deadzone.
                         stick[0] = value
-                        last_input = time.time()
                     elif code in (ABS_HAT0X, ABS_HAT0Y):
                         # d-pads that report as a hat rather than BTN_DPAD_*
                         last_input = time.time()
