@@ -28,3 +28,8 @@ device/badchange.*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# the source phone photo the console plate is cut from -- the processed
+# docs/img/console.png ships, the original does not
+WhatsApp*
+*.jpeg
