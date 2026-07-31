@@ -35,7 +35,13 @@ function Say([string]$m) { Write-Host "$(Get-Date -Format HH:mm:ss)  $m" }
 
 # --- single instance --------------------------------------------------------
 $script:mutex = New-Object System.Threading.Mutex($false, 'Global\PocketClawdPusher')
-if (-not $script:mutex.WaitOne(0)) {
+try {
+    $owned = $script:mutex.WaitOne(0)
+} catch [System.Threading.AbandonedMutexException] {
+    # the previous copy was killed rather than closed; the mutex is ours now
+    $owned = $true
+}
+if (-not $owned) {
     Say "Another pusher is already running - this window can be closed."
     Start-Sleep 4
     exit 0
@@ -311,7 +317,10 @@ while ($true) {
         $send.sessions = (($fresh | ForEach-Object { $_.n }) -join ",")
         $send.session_info = $fresh
         $body = $send | ConvertTo-Json -Compress
-        $headers = @{ 'Content-Type' = 'application/json' }
+        # Content-Type goes via -ContentType only: PowerShell 5.1 throws
+        # "The 'Content-Type' header must be modified using the appropriate
+        # property or method" if it is also present in -Headers.
+        $headers = @{}
         if ($Secret) { $headers['X-Clawd-Secret'] = $Secret }
         $sent = 0
         foreach ($url in $targets) {

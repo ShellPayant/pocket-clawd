@@ -114,22 +114,37 @@ def store(payload, link):
             json.dump(payload, f)
         os.replace(tmp, DATA)
     except OSError as exc:
-        # /tmp is sticky: if the file was created by root (the launcher runs
-        # under sudo) a later non-root run cannot rename over it, even though
-        # it can write to it. Fall back to writing in place.
+        # /tmp is sticky, so if this file was created by root (the launcher
+        # runs under sudo) a later non-root run can neither rename over it nor
+        # necessarily write to it. Try in place, then try replacing it
+        # outright, and only then give up -- with a message that says what is
+        # actually wrong rather than just "operation not permitted".
         try:
             os.remove(tmp)
         except OSError:
             pass
-        try:
-            with open(DATA, "w") as f:
-                json.dump(payload, f)
+        for attempt in ("in place", "after unlinking"):
             try:
-                os.chmod(DATA, 0o666)
+                if attempt == "after unlinking":
+                    os.remove(DATA)
+                with open(DATA, "w") as f:
+                    json.dump(payload, f)
+                try:
+                    os.chmod(DATA, 0o666)   # so either user can rewrite it
+                except OSError:
+                    pass
+                break
+            except OSError:
+                continue
+        else:
+            log("cannot write %s (%s)" % (DATA, exc))
+            try:
+                st = os.stat(DATA)
+                log("  it is owned by uid %d and we are uid %d -- delete it, or"
+                    % (st.st_uid, os.getuid()))
+                log("  set \"data_path\" in config.json to somewhere writable")
             except OSError:
                 pass
-        except OSError:
-            log("cannot write %s: %s" % (DATA, exc))
             return False
     log_hist(payload)
     return True
@@ -248,8 +263,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def run_push(cfg, beacon):
     Handler.secret = cfg.get("secret", "")
-    srv = http.server.HTTPServer((cfg.get("bind", "0.0.0.0"),
-                                  clawd_config.as_int(cfg, "port", 8788, 1, 65535)), Handler)
+    bind = cfg.get("bind", "0.0.0.0")
+    port = clawd_config.as_int(cfg, "port", 8788, 1, 65535)
+    try:
+        srv = http.server.HTTPServer((bind, port), Handler)
+    except OSError as exc:
+        log("cannot listen on %s:%d (%s)" % (bind, port, exc))
+        log("another copy is probably already running -- this one is exiting")
+        return
     srv.timeout = 1.0
     log("listening on %s:%s%s" % (cfg.get("bind", "0.0.0.0"), cfg.get("port"),
                                   " (secret required)" if Handler.secret else ""))

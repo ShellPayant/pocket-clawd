@@ -1410,9 +1410,11 @@ def ensure_netd():
     process group when a tool exits, silently, so this runs on a timer."""
     if SIM or not os.path.exists(NETD):
         return
-    marker = NETD.encode("utf-8", "replace")
+    # Match the basename, not the full path: started from its own directory
+    # the process's command line is just "python3 netd.py", and missing it
+    # means starting a second one that dies on "address already in use".
     for _pid, cmd in _cmdlines():
-        if marker in cmd:
+        if b"netd.py" in cmd:
             return
     log = os.path.join(state_dir(), "netd.log")
     try:
