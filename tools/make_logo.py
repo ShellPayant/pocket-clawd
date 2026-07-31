@@ -14,6 +14,7 @@ Needs Pillow, on the PC only. The console never runs this.
 import argparse
 import math
 import os
+import random
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -91,6 +92,147 @@ def svg_wrapper(png_path, out_path):
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(svg)
     return w, h
+
+
+DEEP = (8, 22, 46)
+SHALLOW = (40, 100, 146)
+SANDC = (150, 126, 84)
+SAND_L = (186, 162, 116)
+SAND_D = (104, 86, 58)
+KELP_DARK = (14, 54, 54)
+KELP_MID = (26, 94, 76)
+KELP_LIT = (58, 168, 112)
+CORAL_PINK = (196, 92, 128)
+CORAL_PURPLE = (126, 82, 172)
+SHELL = (222, 176, 190)
+
+
+def scene(w=960, h=720):
+    """The full-bleed carousel background.
+
+    This slot is `pos 0 0 / size 1 1` in the theme -- it is stretched over the
+    entire screen -- so it is the background for our system rather than a badge
+    sitting on top of one. Hence no frame and no panel: the water runs to all
+    four edges and the art has to work as a backdrop with the theme's own text
+    drawn over it. Authored 4:3 to match the panel it gets stretched onto.
+    """
+    from PIL import Image
+
+    scr = clawd.Screen(logical=(w, h), plain=True)
+    scr.clear()
+    sand_y = int(h * 0.74)
+
+    def water_at(y):
+        f = min(1.0, max(0.0, y / float(sand_y))) ** 0.85
+        return tuple(int(SHALLOW[i] + (DEEP[i] - SHALLOW[i]) * f) for i in range(3))
+
+    for y in range(sand_y):
+        scr.rect(0, y, w, 1, water_at(y))
+
+    # light shafts from the surface. They have to be pre-blended against the
+    # gradient underneath: the blitter has no alpha, it only copies pixels.
+    for sx, sw, lean in ((90, 74, 70), (300, 120, 46), (545, 86, 78), (790, 58, 34)):
+        for y in range(sand_y):
+            k = y / float(sand_y)
+            base = water_at(y)
+            fade = (1.0 - k) ** 1.35
+            col = tuple(min(255, int(base[j] + (225 - base[j]) * 0.17 * fade))
+                        for j in range(3))
+            scr.rect(int(sx + lean * k), y, max(2, int(sw * (1 - 0.3 * k))), 1, col)
+
+    def kelp(x0, height, width, col, phase, lean=0.0):
+        seg = 15
+        y, k = sand_y + 6, 0
+        while y > sand_y - height:
+            off = int(math.sin(phase + k * 0.42) * (5 + k * 0.55) + lean * k)
+            scr.rect(x0 + off, y - seg, max(3, width - k // 4), seg + 1, col)
+            y -= seg
+            k += 1
+
+    # dark kelp forest hugging both edges, lighter blades in front
+    for x0, hh, ww, col, ph, ln in (
+            (-6, 640, 46, KELP_DARK, 0.0, 0.6), (46, 560, 34, KELP_DARK, 1.3, 0.4),
+            (104, 430, 24, KELP_MID, 2.4, 0.3), (150, 330, 16, KELP_LIT, 0.7, 0.2),
+            (w - 44, 620, 46, KELP_DARK, 2.0, -0.6),
+            (w - 96, 520, 32, KELP_DARK, 0.4, -0.4),
+            (w - 140, 400, 22, KELP_MID, 1.7, -0.3),
+            (w - 186, 300, 15, KELP_LIT, 3.0, -0.2)):
+        kelp(x0, hh, ww, col, ph, ln)
+
+    def bubble(bx, by, s):
+        """A square outline reads as a box, not a bubble. Cutting the corners
+        is enough to make it round at this pixel size."""
+        c = (120, 190, 220)
+        n = max(1, s // 4)                      # corner bite
+        t = 2 if s > 8 else 1
+        scr.rect(bx + n, by, s - 2 * n, t, c)              # top
+        scr.rect(bx + n, by + s - t, s - 2 * n, t, c)      # bottom
+        scr.rect(bx, by + n, t, s - 2 * n, c)              # left
+        scr.rect(bx + s - t, by + n, t, s - 2 * n, c)      # right
+        for dx, dy in ((n - t, n - t), (s - n, n - t),
+                       (n - t, s - n), (s - n, s - n)):    # corner pixels
+            scr.rect(bx + dx, by + dy, t, t, c)
+        if s >= 9:                                          # highlight
+            scr.rect(bx + n, by + n, 2, 2, (205, 238, 252))
+
+    # bubbles, denser and larger nearer the surface
+    rnd = random.Random(11)
+    for _ in range(46):
+        by = rnd.randrange(20, sand_y - 20)
+        bx = rnd.randrange(10, w - 30)
+        s = rnd.choice((5, 7, 9, 12, 16))
+        if by > sand_y * 0.6 and s > 9:
+            continue
+        bubble(bx, by, s)
+
+    # sea floor with an uneven edge, so it doesn't read as a drawn rectangle
+    for x in range(w):
+        d = int(math.sin(x / 148.0) * 13 + math.sin(x / 43.0) * 5)
+        ytop = sand_y + d
+        scr.rect(x, ytop, 1, h - ytop, SANDC)
+        scr.rect(x, ytop, 1, 5, SAND_L)
+
+    for _ in range(70):                       # pebbles
+        px = rnd.randrange(6, w - 12)
+        py = rnd.randrange(sand_y + 26, h - 6)
+        s = rnd.choice((3, 4, 6))
+        scr.rect(px, py, s + 2, s, SAND_D if rnd.random() < 0.6 else (128, 146, 168))
+
+    # coral and shells, low and to the sides so the crab keeps the middle
+    for cx, base_col, tip in ((66, CORAL_PURPLE, (170, 130, 214)),
+                              (w - 120, CORAL_PINK, (232, 140, 172))):
+        for i in range(5):
+            bx = cx + i * 15
+            bh = 40 + (i % 3) * 26
+            scr.rect(bx, sand_y + 24 - bh, 10, bh, base_col)
+            scr.rect(bx - 3, sand_y + 24 - bh, 16, 8, tip)
+    for sx in (200, w - 230):
+        sy = h - 60
+        scr.rect(sx, sy, 44, 10, SHELL)
+        scr.rect(sx + 5, sy - 8, 34, 10, SHELL)
+        scr.rect(sx + 13, sy - 15, 18, 9, (240, 205, 215))
+
+    # the crab, centre stage. `floor` is where his legs land, so it wants to be
+    # just below the sand line -- much lower and he's buried to the shoulders.
+    sc = 14
+    floor = sand_y + 34
+    pet = clawd.Clawd(0, floor, sc=sc)
+    pet.x = float(w // 2 - 10 * sc)
+    pet.blink_until = 0
+    pet.next_blink = clawd.time.time() + 9999
+    pet.pcur = [0.0, 0.0]
+    pet.pupil = (0, 0)
+    pet.draw(scr, 0)
+
+    # wordmark, two lines, in the reference's coral-over-cream
+    for text, ty, col in (("POCKET", 118, clawd.ACCENT), ("CLAWD", 214, (238, 226, 200))):
+        ts = 11
+        tx = (w - scr.text_w(text, ts)) // 2
+        for dx, dy in ((0, 5), (5, 0), (5, 5)):
+            scr.text(tx + dx, ty + dy, text, (18, 34, 56), ts)
+        scr.text(tx, ty, text, col, ts)
+
+    return Image.frombytes("RGBA", (w, h), bytes(scr.buf), "raw", "BGRA").convert("RGB")
 
 
 def background(scale=13):
@@ -236,7 +378,7 @@ def main():
     mark.save(alt)
     print("wrote %s (%dx%d)" % (alt, mark.width, mark.height))
 
-    bg = background()
+    bg = scene()
     bgp = os.path.join(outdir, "background_icon.png")
     bg.save(bgp)
     print("wrote %s (%dx%d)" % (bgp, bg.width, bg.height))
