@@ -106,6 +106,10 @@ CORAL_PINK = (196, 92, 128)
 CORAL_PURPLE = (126, 82, 172)
 SHELL = (222, 176, 190)
 
+# The theme's vertical carousel covers roughly x 0.05-0.50 at a higher zIndex.
+# Everything that matters lives to the right of this.
+CLEAR_FROM = 0.55
+
 
 def scene(w=960, h=720):
     """The full-bleed carousel background.
@@ -113,8 +117,18 @@ def scene(w=960, h=720):
     This slot is `pos 0 0 / size 1 1` in the theme -- it is stretched over the
     entire screen -- so it is the background for our system rather than a badge
     sitting on top of one. Hence no frame and no panel: the water runs to all
-    four edges and the art has to work as a backdrop with the theme's own text
-    drawn over it. Authored 4:3 to match the panel it gets stretched onto.
+    four edges.
+
+    Crucially, the theme's carousel is `type vertical` with `logoAlignment
+    left`, at zIndex 5 against our zIndex 3. That means a stack of system logos
+    covers roughly the LEFT HALF of the screen, on top of this. So the crab
+    lives on the right and the left stays quiet open water -- which is exactly
+    why the theme's own art for other systems is right-aligned too.
+
+    No wordmark either: our carousel logo is already the crab plus the name, so
+    putting it here as well shows it twice.
+
+    Authored 4:3 to match the panel it gets stretched onto.
     """
     from PIL import Image
 
@@ -199,38 +213,41 @@ def scene(w=960, h=720):
         scr.rect(px, py, s + 2, s, SAND_D if rnd.random() < 0.6 else (128, 146, 168))
 
     # coral and shells, low and to the sides so the crab keeps the middle
-    for cx, base_col, tip in ((66, CORAL_PURPLE, (170, 130, 214)),
-                              (w - 120, CORAL_PINK, (232, 140, 172))):
+    for cx, base_col, tip in ((70, CORAL_PURPLE, (170, 130, 214)),
+                              (250, CORAL_PINK, (232, 140, 172))):
         for i in range(5):
             bx = cx + i * 15
             bh = 40 + (i % 3) * 26
             scr.rect(bx, sand_y + 24 - bh, 10, bh, base_col)
             scr.rect(bx - 3, sand_y + 24 - bh, 16, 8, tip)
-    for sx in (200, w - 230):
+    for sx in (170, 380):
         sy = h - 60
         scr.rect(sx, sy, 44, 10, SHELL)
         scr.rect(sx + 5, sy - 8, 34, 10, SHELL)
         scr.rect(sx + 13, sy - 15, 18, 9, (240, 205, 215))
 
-    # the crab, centre stage. `floor` is where his legs land, so it wants to be
-    # just below the sand line -- much lower and he's buried to the shoulders.
-    sc = 14
-    floor = sand_y + 34
+    # The crab, in the right-hand region the logo stack can't reach. He is 36
+    # sprite cells wide with both claws out, so derive the cell size from the
+    # space available rather than picking one and clipping a claw off the edge.
+    clear_x0, clear_x1 = int(w * CLEAR_FROM), w - 16
+    sc = max(6, min(13, (clear_x1 - clear_x0 - 20) // 36))
+    centre = (clear_x0 + clear_x1) // 2
+    floor = sand_y + 36
     pet = clawd.Clawd(0, floor, sc=sc)
-    pet.x = float(w // 2 - 10 * sc)
+    pet.x = float(centre - 10 * sc)              # he spans x-8*sc .. x+28*sc
     pet.blink_until = 0
     pet.next_blink = clawd.time.time() + 9999
     pet.pcur = [0.0, 0.0]
     pet.pupil = (0, 0)
     pet.draw(scr, 0)
 
-    # wordmark, two lines, in the reference's coral-over-cream
-    for text, ty, col in (("POCKET", 118, clawd.ACCENT), ("CLAWD", 214, (238, 226, 200))):
-        ts = 11
-        tx = (w - scr.text_w(text, ts)) // 2
-        for dx, dy in ((0, 5), (5, 0), (5, 5)):
-            scr.text(tx + dx, ty + dy, text, (18, 34, 56), ts)
-        scr.text(tx, ty, text, col, ts)
+    # a couple of friends in front, so it reads as the tank and not a mascot
+    if clawd.PETS:
+        for name, fx in (("waving", clear_x0 + 40), ("happy", clear_x1 - 40)):
+            if name in clawd.PETS:
+                fr = clawd.Friend(name, fx, floor + 8)
+                fr.next_hop = clawd.time.time() + 9999
+                fr.draw(scr)
 
     return Image.frombytes("RGBA", (w, h), bytes(scr.buf), "raw", "BGRA").convert("RGB")
 
