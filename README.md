@@ -7,8 +7,8 @@ cheap handheld games console sitting on your desk, so you can glance at it inste
 check. There is also a crab. He lives in a fish tank at the bottom of the screen and gets visibly
 worried as your usage climbs.
 
-It's a hobby project, it's free, and it runs on a console that costs about £40 —
-**or in a window on your computer, if you haven't got one.**
+It's a hobby project, it's free, and it runs on a console that costs about €40. Haven't got one?
+It runs in a window on your computer too.
 
 ---
 
@@ -18,7 +18,7 @@ It's a hobby project, it's free, and it runs on a console that costs about £40 
 
 The three bars are your limits. The chart is the last hour, so you can see whether you're burning
 through it or coasting. The tank at the bottom-right has one pet for every project you currently
-have Claude Code open in — `SIDEQUEST X3` means three terminals in that one — and a pet that's
+have Claude Code open in, so `SIDEQUEST X3` means three terminals in that one, and a pet that's
 actually working right now looks busy rather than asleep.
 
 Every so often another pet drifts through with its name on it. There are 21 of them and most are
@@ -31,9 +31,8 @@ when your login expires.
 python desktop/clawd_desktop.py
 ```
 
-The same display, in a window, reading your usage directly — no console, no
-network setup, nothing to configure. Add `--demo` to see it working before you
-even log in to anything.
+The same display, in a window, reading your usage directly. No console, no network setup, nothing
+to configure. Add `--demo` to see it working before you even log in to anything.
 
 Needs `pip install pillow`, plus `sudo apt install python3-tk` on Linux.
 
@@ -43,11 +42,11 @@ Needs `pip install pillow`, plus `sudo apt install python3-tk` on Linux.
 
 | | |
 |---|---|
-| **A handheld** | An R36S or one of its clones — a pocket-sized Linux games console, around £40 on AliExpress. Any similar handheld with a 640×480 screen will do; [the full list is here](docs/COMPATIBILITY.md). |
+| **A handheld** | An R36S or one of its clones: a pocket-sized Linux games console, around €40 on AliExpress. Any similar handheld with a 640×480 screen will do. [The full list is here](docs/COMPATIBILITY.md). |
 | **Claude Code** | Already installed and logged in on your computer. That's where the numbers come from. |
 | **A network** | Both on the same WiFi is easiest. There are other ways, including one that needs no computer at all. |
 
-Nothing to install on the console or for the pusher — standard library only, because a lot of
+Nothing to install on the console or for the pusher, standard library only, because a lot of
 handheld firmware ships a locked-down filesystem with no way to add packages. (The optional desktop
 window is the one exception: it needs `pillow`, and `python3-tk` on Linux.)
 
@@ -56,7 +55,7 @@ window is the one exception: it needs `pillow`, and `python3-tk` on Linux.)
 ![Your computer reads the numbers, the network carries them, the console draws them](docs/img/how-it-works.png)
 
 Claude Code already keeps a login on your computer. A small script uses it to ask Anthropic how
-much of your own quota you've used, and sends just the percentages to the console — no prompts, no
+much of your own quota you've used, and sends just the percentages to the console. No prompts, no
 code, no login details. You can see exactly what gets sent by running it with `--dry-run`.
 
 ## Install
@@ -68,8 +67,8 @@ code, no login details. You can see exactly what gets sent by running it with `-
 git clone https://github.com/ShellPayant/pocket-clawd.git
 ```
 
-**2. Get the console onto your WiFi** — on ArkOS that's *Options → WiFi Settings*. While you're
-there, turn on **Remote Services** (also under Options); that's SSH, and it's how you'll copy files
+**2. Get the console onto your WiFi.** On ArkOS that's *Options → WiFi Settings*. While you're
+there, turn on **Remote Services** (also under Options), which is SSH, and is how you'll copy files
 across. The console shows its IP address in the same WiFi menu.
 
 **3. Copy the folder onto the console.** Either put the SD card in your computer and drop the
@@ -95,11 +94,11 @@ Safe to run twice. `install/uninstall.sh` puts everything back exactly as it was
 
 **5. Start it on your computer, and leave it running.**
 
-* **Windows** — double-click `pc\Start Pocket Clawd.cmd`. Nothing to install.
-* **Mac or Linux** — `python pc/clawd_pusher.py`
+* **Windows**: double-click `pc\Start Pocket Clawd.cmd`. Nothing to install.
+* **Mac or Linux**: `python pc/clawd_pusher.py`
 
 The console announces itself on the network, so there's usually no address to type. Within a few
-seconds the bars fill in. Close that window and the console stops getting updates — it'll show
+seconds the bars fill in. Close that window and the console stops getting updates. It'll show
 `(STALE!)` and then Clawd falls asleep.
 
 Stuck at any step? [docs/INSTALL.md](docs/INSTALL.md) goes through it slowly, including what to do
@@ -109,7 +108,7 @@ when something doesn't appear.
 
 Some of these handhelds use a cheap WiFi dongle that can't join modern 5GHz or WPA3 networks. And
 sometimes you're not at home. There are four ways to get the numbers across, including the console
-asking Anthropic directly with no computer involved — [docs/NETWORKING.md](docs/NETWORKING.md)
+asking Anthropic directly with no computer involved. [docs/NETWORKING.md](docs/NETWORKING.md)
 explains all four and when to pick which.
 
 ## The buttons
@@ -123,7 +122,7 @@ explains all four and when to pick which.
 | ![](docs/screenshots/normal.png) | **Plenty left.** Bars green, Clawd relaxed. |
 | ![](docs/screenshots/busy.png) | **Getting through it.** Amber, and he's started paying attention. |
 | ![](docs/screenshots/critical.png) | **Nearly out.** Red, and he's alarmed. |
-| ![](docs/screenshots/ratelimited.png) | **Anthropic is rate-limiting the check itself.** Nothing's broken — the 429 pet swims in to apologise and it retries shortly. |
+| ![](docs/screenshots/ratelimited.png) | **Anthropic is rate-limiting the check itself.** Nothing's broken. The 429 pet swims in to apologise and it retries shortly. |
 | ![](docs/screenshots/sleeping.png) | **Nothing's arrived for ten minutes.** He goes to sleep. Usually means the computer went to sleep too. |
 | ![](docs/screenshots/nodata.png) | **Never connected.** The pusher isn't running, or hasn't found the console. |
 
@@ -135,32 +134,32 @@ Two words get animated whenever he says them:
 
 Everything worth changing is a plain file you can edit on the card:
 
-* **`quips.txt`** — everything Clawd says, one line each. This is the whole feature; write your own.
-* **`anthem.wav`** — what L2 plays. Drop in any file named `anthem.*` (mp3, ogg, wav…) and yours
+* **`quips.txt`**: everything Clawd says, one line each. This is the whole feature, so write your
+  own.
+* **`anthem.wav`**: what L2 plays. Drop in any file named `anthem.*` (mp3, ogg, wav…) and yours
   takes over. The one included is an original chiptune from `tools/bake_chiptune.py`.
 
   The track this was really built to play is
-  **[Claude's Plan by Jeff Guo](https://www.youtube.com/watch?v=9kT0oLBPiOw)** — not bundled, to
-  keep the download small. Save your own copy as `anthem.mp3` in the app folder and it takes over
-  automatically.
-* **`config.json`** — thresholds, button codes, how it gets its data. Every setting is optional.
+  **[Claude's Plan by Jeff Guo](https://www.youtube.com/watch?v=9kT0oLBPiOw)**. It isn't bundled,
+  to keep the download small. Save your own copy as `anthem.mp3` in the app folder and it takes
+  over automatically.
+* **`config.json`**: thresholds, button codes, how it gets its data. Every setting is optional.
 
-`python tools/sim.py` renders any state to a picture without a console attached —
-that's how every screenshot here was made — and `python desktop/clawd_desktop.py`
-runs it live in a window.
+`python tools/sim.py` renders any state to a picture without a console attached, which is how every
+screenshot here was made. `python desktop/clawd_desktop.py` runs it live in a window.
 
 ## Credits
 
 The little pets are **[clawd-pet](https://github.com/abderrahimghazali/clawd-pet)** by
-[@abderrahimghazali](https://github.com/abderrahimghazali) — 90-odd animated SVG Clawds, MIT
+[@abderrahimghazali](https://github.com/abderrahimghazali): 90-odd animated SVG Clawds, MIT
 licensed, and a delight. 21 of them are bundled here, converted into sprites the console can draw.
-The originals and their licence are in `assets/pets-svg/`; see [NOTICE.md](NOTICE.md).
+The originals and their licence are in `assets/pets-svg/`, see [NOTICE.md](NOTICE.md).
 
 The big crab is drawn in code, pixel by pixel, and is mine.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE). Do what you like with it.
+MIT, see [LICENSE](LICENSE). Do what you like with it.
 
 Not affiliated with Anthropic. "Claude" and "Clawd" are theirs. This reads your own usage numbers,
 with your own login, and draws a crab about it.
