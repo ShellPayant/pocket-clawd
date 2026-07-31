@@ -197,55 +197,66 @@ def specimen_row(img, names, y, x0, x1, height, label_font=None):
 
 # ---------------------------------------------------------------- social ---
 
+SQUARE = 640           # WhatsApp and friends take a square out of the middle
+
+
 def social_preview(console_plate=None):
-    """1280x640. Keep everything that matters inside a 60px margin: X and Slack
-    render this at 1.91:1 and crop ~29px off each side."""
+    """1280x640, composed so the CENTRE SQUARE stands on its own.
+
+    You get one og:image and every platform crops it differently. X, Discord and
+    LinkedIn take 1.91:1, which only shaves the sides. WhatsApp takes a square
+    out of the middle -- so a wide layout with the title on the left and the
+    subject on the right shows a chat thumbnail of the empty gap between them,
+    which is exactly what the first version did.
+
+    Hence: everything that identifies the project lives inside the middle 640px.
+    The sides carry decoration only, and lose nothing when they're cropped."""
     W, H = 1280, 640
     img = paper(W, H)
-
-    # right: the console, photographed, on a raised card
-    plate_path = console_plate or os.path.join(IMG, "console.png")
-    if os.path.exists(plate_path):
-        plate = fit(Image.open(plate_path).convert("RGB"), target_h=474)
-        # the photo has specular highlights on the plastic; ivory bottoms out at
-        # #FAF9F5 in this system, so pull pure white back off the top
-        plate = plate.point(lambda v: min(v, 249))
-        cw = plate.width + 76
-        cx0 = W - 70 - cw
-        card(img, (cx0, 56, W - 70, 606), fill=CARD, radius=20)
-        px0, py0 = cx0 + 38, 84
-        img.paste(plate, (px0, py0))
-        d = ImageDraw.Draw(img)
-        d.rectangle((px0, py0, px0 + plate.width - 1, py0 + plate.height - 1),
-                    outline=HAIR, width=1)
-        d.text((cx0 + cw // 2, py0 + plate.height + 12), "running on the real thing",
-               font=font(SANS_R, 17), fill=MUTED, anchor="ma")
-
-    # left column
-    x = 84
     d = ImageDraw.Draw(img)
+    cx = W // 2
+    inner = SQUARE - 80        # keep clear of the square crop's own edges
 
-    # THE one clay element: the rule that opens the page
-    d.rectangle((x, 118, x + 96, 123), fill=CLAY)
+    # THE one clay element
+    d.rectangle((cx - 48, 52, cx + 48, 57), fill=CLAY)
 
-    col = 620          # the text column, wide enough to keep the gap honest
-    text(img, (x, 150), "Pocket Clawd", font(SERIF, 84))
-    d.line((x, 268, x + col, 268), fill=HAIR, width=1)
+    # title, sized down if it would ever overflow the square
+    size = 76
+    while size > 40 and d.textlength("Pocket Clawd", font=font(SERIF, size)) > inner:
+        size -= 2
+    d.text((cx, 74), "Pocket Clawd", font=font(SERIF, size), fill=INK, anchor="ma")
 
-    text(img, (x, 292),
-         "Your Claude usage limits, live on a handheld\n"
-         "games console that costs about the price of\n"
-         "a takeaway.",
-         font(SERIF, 31), fill=INK2, spacing=45)
+    sub = "Your Claude usage, on a handheld games console."
+    ssize = 26
+    while ssize > 14 and d.textlength(sub, font=font(SERIF, ssize)) > inner:
+        ssize -= 1
+    d.text((cx, 176), sub, font=font(SERIF, ssize), fill=INK2, anchor="ma")
 
-    text(img, (x, 456), "There is a crab. He gets worried when you don't.",
-         font(SERIF_I, 22), fill=MUTED)
+    # the console, centred, on a raised card
+    plate_path = console_plate or os.path.join(IMG, "console.png")
+    bottom = 520
+    if os.path.exists(plate_path):
+        plate = fit(Image.open(plate_path).convert("RGB"), target_h=278)
+        # the photo has specular highlights; ivory bottoms out at #FAF9F5 here
+        plate = plate.point(lambda v: min(v, 249))
+        cwid, chgt = plate.width + 56, 278 + 56
+        cx0, cy0 = cx - cwid // 2, 214
+        card(img, (cx0, cy0, cx0 + cwid, cy0 + chgt), fill=CARD, radius=18)
+        img.paste(plate, (cx0 + 28, cy0 + 28))
+        d.rectangle((cx0 + 28, cy0 + 28, cx0 + 28 + plate.width - 1,
+                     cy0 + 28 + plate.height - 1), outline=HAIR, width=1)
+        bottom = cy0 + chgt
 
-    text(img, (x, 514), "BY SHELLPAYANT", font(SANS, 18), fill=INK2)
-    d.line((x, 548, x + col, 548), fill=HAIR, width=1)
+    d.text((cx, bottom + 16), "BY SHELLPAYANT", font=font(SANS, 18),
+           fill=INK2, anchor="ma")
+
+    # decoration only: the specimen row runs off both sides, and the square
+    # crop simply takes the middle of it
     names = pet_names()
-    specimen_row(img, names[:14], 598, x, x + col, 34)
-
+    d.line((60, 592, W - 60, 592), fill=HAIR, width=1)
+    row_h = 32
+    baseline = H - 8                      # sprites sit ABOVE this, so keep it
+    specimen_row(img, names, baseline, 40, W - 40, row_h)   # inside the canvas
     return img
 
 
