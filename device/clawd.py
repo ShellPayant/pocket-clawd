@@ -705,6 +705,7 @@ class Clawd:
         self.stick_until = 0     # joystick control active
         self.forced_mood = None  # (mood, until) via d-pad showcase
         self.force_sleep_until = 0
+        self.avoid = []          # friend centres he tries not to stand behind
         self.throw_until = 0     # claws up, launching the tank friends
         self._bag = []           # quips dealt without replacement
         self._bag_of = 0
@@ -787,6 +788,23 @@ class Clawd:
         else:
             self.jump_until = time.time() + 0.6
 
+    def pick_spot(self, xmin, xmax):
+        """A roam target that keeps the shell out from under the session
+        signs: friends draw in FRONT of Clawd (seeing every session is the
+        point of the tank), so him standing behind one puts a pet on his
+        face. Of a handful of random candidates, take the one whose body
+        centre lands farthest from the nearest friend. A crowded tank can't
+        avoid overlap - then this just picks the least-bad spot."""
+        if not self.avoid:
+            return random.uniform(xmin, xmax)
+
+        def clearance(x):
+            c = x + 10 * self.sc      # body spans x-8*sc .. x+28*sc
+            return min(abs(c - a) for a in self.avoid)
+
+        return max((random.uniform(xmin, xmax) for _ in range(8)),
+                   key=clearance)
+
     def update(self, xmin, xmax, idle_for):
         t = time.time()
         if t > self.next_blink:
@@ -796,7 +814,7 @@ class Clawd:
             self.pupil = (random.randint(-2, 2), random.randint(-1, 1))
             self.next_look = t + random.uniform(1.5, 4)
         if t > self.next_move and t > self.dance_until:
-            self.tx = random.uniform(xmin, xmax)
+            self.tx = self.pick_spot(xmin, xmax)
             self.next_move = t + random.uniform(30, 55)
         if idle_for > 8 and t > self.next_auto and not self.sleeping:
             self.auto_show()
@@ -971,10 +989,15 @@ CLAWD_SCALE = {0: 5, 1: 4, 2: 4, 3: 3, 4: 3, 5: 3}
 
 def friend_layout(n):
     """Evenly spaced centres across the water, plus the character budget for
-    each sign so they don't collide at the tighter spacings."""
+    each sign so they don't collide at the tighter spacings. One or two
+    friends keep to the left half, so Clawd has a bay of his own on the
+    right instead of standing behind somebody's sign (friends draw in front
+    of him, and a pet parked on his face reads as a glitch)."""
     if n <= 0:
         return [], 10
     x0, x1 = AQ_IN_X0 + 6, AQ_IN_X1 - 6
+    if n <= 2:
+        x1 = x0 + (x1 - x0) // 2
     pitch = (x1 - x0) / float(n)
     centres = [int(x0 + pitch * (i + 0.5)) for i in range(n)]
     # a sign is len(label) * 6 + 8 pixels wide, and must fit inside the pitch
@@ -2009,6 +2032,7 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
         # one friend per active Claude Code project, sized and spaced to fit
         info = parse_sessions(d)
         if PETS and info != [(f.session, f.count, f.busy) for f in friends]:
+            first_layout = not friends
             centres, maxlen = friend_layout(len(info))
             friends[:] = [
                 Friend(None, centres[i], FRIEND_FLOOR, name, count, busy, maxlen)
@@ -2017,7 +2041,12 @@ def run(scr, evs, held, last_input, clawd, friends, shown,
             clawd.sc = CLAWD_SCALE.get(len(info), 3)
             lo, hi = clawd_bounds(clawd.sc)
             clawd.x = min(max(clawd.x, lo), hi)
-            clawd.tx = clawd.x
+            # ...and walks clear of the new signs instead of standing behind
+            # one. On the very first layout he just starts clear.
+            clawd.avoid = centres
+            clawd.tx = clawd.pick_spot(lo, hi)
+            if first_layout:
+                clawd.x = clawd.tx
         clawd_lo, clawd_hi = clawd_bounds(clawd.sc)
         for fr in friends:
             fr.update(345, 575)
