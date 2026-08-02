@@ -10,6 +10,9 @@ worried as your usage climbs.
 It's a hobby project, it's free, and it runs on a console that costs about €40. Haven't got one?
 It runs in a window on your computer too.
 
+**[▶ See it running in your browser](https://shellpayant.github.io/pocket-clawd/)** — every
+state, rendered by the same code the console runs.
+
 ---
 
 ## What you're looking at

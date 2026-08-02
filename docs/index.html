@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pocket Clawd — demo</title>
+<style>
+  :root {
+    --paper: #F0EEE6;
+    --card: #FAF9F5;
+    --ink: #141413;
+    --faint: #6B6A66;
+    --hairline: #CCCBC8;
+    --clay: #D97757;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px 16px 56px;
+  }
+  .wrap { width: 100%; max-width: 700px; }
+  h1 { font-weight: normal; font-size: 34px; letter-spacing: -0.01em; }
+  h1 em { font-style: normal; color: var(--clay); }
+  .sub { color: var(--faint); margin: 8px 0 28px; }
+  .sub a, .foot a { color: var(--clay); }
+  .states { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  button {
+    font-family: ui-monospace, "Consolas", monospace;
+    font-size: 13px;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    padding: 8px 14px;
+    cursor: pointer;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+  }
+  button:hover { border-color: var(--faint); }
+  button.on { background: var(--clay); border-color: var(--clay); color: var(--card); }
+  .screen {
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    padding: 10px;
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  }
+  .screen img { width: 100%; display: block; image-rendering: pixelated; }
+  .caption { color: var(--faint); font-size: 15px; margin-top: 12px; min-height: 3em; }
+  .foot {
+    margin-top: 40px;
+    color: var(--faint);
+    font-size: 14px;
+    border-top: 1px solid var(--hairline);
+    padding-top: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pocket <em>Clawd</em></h1>
+  <div class="sub">
+    Your Claude usage limits on a &euro;40 handheld, with a crab that worries about
+    them so you don't have to. This page plays the real interface, rendered by the
+    same code the console runs &mdash;
+    <a href="https://github.com/ShellPayant/pocket-clawd">get it on GitHub</a>.
+  </div>
+
+  <div class="states" id="states"></div>
+  <div class="screen"><img id="fb" src="demo/normal.gif" alt="Pocket Clawd screen"></div>
+  <div class="caption" id="cap"></div>
+
+  <div class="foot">
+    <a href="https://github.com/ShellPayant/pocket-clawd">source</a> &middot;
+    <a href="https://github.com/ShellPayant/pocket-clawd/blob/main/docs/INSTALL.md">install</a> &middot;
+    <a href="https://shellpayant.github.io/runner-protocol/">the aggressive sibling</a><br>
+    Not affiliated with Anthropic. It reads your own usage numbers, with your own
+    login, and draws a crab about it.
+  </div>
+</div>
+
+<script>
+  const STATES = {
+    "NORMAL":       { gif: "normal",      cap: "Plenty left. Bars green, Clawd relaxed." },
+    "BUSY":         { gif: "busy",        cap: "Getting through it. Amber, and he's started paying attention." },
+    "CRITICAL":     { gif: "critical",    cap: "Nearly out. Red, and he's alarmed." },
+    "RATE-LIMITED": { gif: "ratelimited", cap: "Anthropic is rate-limiting the check itself. Nothing's broken — the 429 pet swims in to apologise and it retries shortly." },
+    "SLEEPING":     { gif: "sleeping",    cap: "Nothing's arrived for ten minutes, so he goes to sleep. Usually means the computer did too." },
+    "NO DATA":      { gif: "nodata",      cap: "Never connected. The pusher isn't running, or hasn't found the console." },
+    "THE TANK":     { gif: "tank",        cap: "One pet per project you have Claude Code open in. SIDEQUEST X3 means three terminals in that one, and a pet that's actually working looks busy rather than asleep." },
+    "ULTRATHINK":   { gif: "ultrathink",  cap: "Two words get animated whenever he says them. This is one." }
+  };
+  const statesEl = document.getElementById("states");
+  const fb = document.getElementById("fb");
+  const cap = document.getElementById("cap");
+  let cur = "NORMAL";
+
+  function show() {
+    fb.src = "demo/" + STATES[cur].gif + ".gif";
+    cap.textContent = STATES[cur].cap;
+    statesEl.innerHTML = "";
+    Object.keys(STATES).forEach(name => {
+      const b = document.createElement("button");
+      b.textContent = name;
+      if (name === cur) b.className = "on";
+      b.onclick = () => { cur = name; show(); };
+      statesEl.appendChild(b);
+    });
+  }
+  show();
+</script>
+</body>
+</html>
